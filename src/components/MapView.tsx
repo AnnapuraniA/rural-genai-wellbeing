@@ -1,10 +1,26 @@
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { MapMarker, getMarkerColor, getGoogleMapsDirectionUrl } from '@/lib/mapServices';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
 import { useLanguage } from '@/contexts/LanguageContext';
+import 'leaflet/dist/leaflet.css';
+import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
+import L from 'leaflet';
+
+// Fix for Leaflet marker icons
+// This is needed because Leaflet's default marker icons reference assets that aren't included
+// when bundled with modern build tools
+useEffect(() => {
+  delete (L.Icon.Default.prototype as any)._getIconUrl;
+  
+  L.Icon.Default.mergeOptions({
+    iconRetinaUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png',
+    iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
+    shadowUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png',
+  });
+}, []);
 
 interface MapViewProps {
   markers: MapMarker[];
@@ -17,6 +33,15 @@ interface MapViewProps {
   userLocation?: { latitude: number; longitude: number };
 }
 
+// Helper component to set the map view when center prop changes
+function SetMapView({ center }: { center: [number, number] }) {
+  const map = useMap();
+  useEffect(() => {
+    map.setView(center, map.getZoom());
+  }, [center, map]);
+  return null;
+}
+
 const MapView: React.FC<MapViewProps> = ({
   markers,
   center,
@@ -27,228 +52,24 @@ const MapView: React.FC<MapViewProps> = ({
   allowDirections = false,
   userLocation
 }) => {
-  const mapRef = useRef<HTMLDivElement>(null);
-  const [mapInitialized, setMapInitialized] = useState(false);
-  const [selectedMarker, setSelectedMarker] = useState<MapMarker | null>(null);
   const { toast } = useToast();
   const { language } = useLanguage();
+  const [selectedMarker, setSelectedMarker] = useState<MapMarker | null>(null);
   
-  // This effect initializes a simple map display
-  // In a real app, this would use a proper mapping library like Leaflet or Google Maps
-  useEffect(() => {
-    if (!mapRef.current || mapInitialized) return;
-    
-    try {
-      // Canvas dimensions
-      const width = mapRef.current.clientWidth;
-      const height = mapRef.current.clientHeight;
-      
-      // Create canvas for our simple map
-      const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      canvas.style.width = '100%';
-      canvas.style.height = '100%';
-      
-      mapRef.current.appendChild(canvas);
-      
-      // Mark map as initialized
-      setMapInitialized(true);
-    } catch (error) {
-      console.error('Error initializing map:', error);
+  // Set default center if not provided
+  const mapCenter = center 
+    ? [center.latitude, center.longitude] as [number, number]
+    : [12.1289, 78.1578] as [number, number]; // Dharmapuri district coordinates
+  
+  // Handle marker click
+  const handleMarkerClick = (marker: MapMarker) => {
+    setSelectedMarker(marker);
+    if (onMarkerClick) {
+      onMarkerClick(marker);
     }
-  }, [mapInitialized]);
+  };
   
-  // This effect draws the markers on the map
-  useEffect(() => {
-    if (!mapInitialized || !mapRef.current) return;
-    
-    try {
-      const canvas = mapRef.current.querySelector('canvas') as HTMLCanvasElement;
-      if (!canvas) return;
-      
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-      
-      // Clear canvas
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      
-      // Draw background with a more distinct color
-      ctx.fillStyle = '#EBF2F9';  // Light blue background for better contrast
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      
-      // Add grid lines for better orientation
-      ctx.strokeStyle = '#D1DCE8';
-      ctx.lineWidth = 1;
-      
-      // Grid lines
-      for (let i = 0; i < canvas.width; i += 40) {
-        ctx.beginPath();
-        ctx.moveTo(i, 0);
-        ctx.lineTo(i, canvas.height);
-        ctx.stroke();
-      }
-      
-      for (let j = 0; j < canvas.height; j += 40) {
-        ctx.beginPath();
-        ctx.moveTo(0, j);
-        ctx.lineTo(canvas.width, j);
-        ctx.stroke();
-      }
-      
-      // Calculate map bounds
-      let minLat = Infinity;
-      let maxLat = -Infinity;
-      let minLng = Infinity;
-      let maxLng = -Infinity;
-      
-      markers.forEach(marker => {
-        minLat = Math.min(minLat, marker.latitude);
-        maxLat = Math.max(maxLat, marker.latitude);
-        minLng = Math.min(minLng, marker.longitude);
-        maxLng = Math.max(maxLng, marker.longitude);
-      });
-      
-      // Add padding to bounds
-      const latPadding = (maxLat - minLat) * 0.1;
-      const lngPadding = (maxLng - minLng) * 0.1;
-      
-      minLat -= latPadding;
-      maxLat += latPadding;
-      minLng -= lngPadding;
-      maxLng += lngPadding;
-      
-      // If center is provided, adjust bounds
-      if (center) {
-        // Add center to bounds calculation
-        minLat = Math.min(minLat, center.latitude);
-        maxLat = Math.max(maxLat, center.latitude);
-        minLng = Math.min(minLng, center.longitude);
-        maxLng = Math.max(maxLng, center.longitude);
-      }
-      
-      // Function to convert coordinates to canvas position
-      const coordToCanvas = (lat: number, lng: number) => {
-        const x = ((lng - minLng) / (maxLng - minLng)) * canvas.width;
-        const y = canvas.height - ((lat - minLat) / (maxLat - minLat)) * canvas.height;
-        return { x, y };
-      };
-      
-      // Draw user location if available
-      if (userLocation) {
-        const pos = coordToCanvas(userLocation.latitude, userLocation.longitude);
-        
-        // Draw user location with a blue pulsing dot
-        ctx.fillStyle = '#2196F3'; // Blue
-        ctx.beginPath();
-        ctx.arc(pos.x, pos.y, 10, 0, 2 * Math.PI);
-        ctx.fill();
-        
-        // Add a ring around user location
-        ctx.strokeStyle = '#0D47A1';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(pos.x, pos.y, 12, 0, 2 * Math.PI);
-        ctx.stroke();
-        
-        // Add a white dot in center for better visibility
-        ctx.fillStyle = '#fff';
-        ctx.beginPath();
-        ctx.arc(pos.x, pos.y, 5, 0, 2 * Math.PI);
-        ctx.fill();
-        
-        // Add "You are here" label
-        ctx.font = 'bold 12px Arial';
-        ctx.fillStyle = '#000';
-        ctx.textAlign = 'center';
-        ctx.fillText(language === 'english' ? 'You are here' : 'நீங்கள் இங்கே', pos.x, pos.y + 25);
-      }
-      
-      // Draw markers with improved visibility
-      markers.forEach(marker => {
-        const pos = coordToCanvas(marker.latitude, marker.longitude);
-        
-        // Determine marker color
-        const color = getMarkerColor(marker.type, marker.distance);
-        
-        // Draw marker circle with larger size and border
-        const isSelected = marker.id === selectedMarkerId;
-        const markerSize = isSelected ? 10 : 8;
-        
-        // Draw shadow for depth
-        ctx.fillStyle = 'rgba(0,0,0,0.3)';
-        ctx.beginPath();
-        ctx.arc(pos.x + 2, pos.y + 2, markerSize, 0, 2 * Math.PI);
-        ctx.fill();
-        
-        // Draw main marker
-        ctx.fillStyle = color;
-        ctx.beginPath();
-        ctx.arc(pos.x, pos.y, markerSize, 0, 2 * Math.PI);
-        ctx.fill();
-        
-        // Add border
-        ctx.strokeStyle = '#fff';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(pos.x, pos.y, markerSize, 0, 2 * Math.PI);
-        ctx.stroke();
-        
-        // Draw selection ring if selected
-        if (isSelected) {
-          ctx.strokeStyle = '#000';
-          ctx.lineWidth = 2;
-          ctx.setLineDash([2, 2]);
-          ctx.beginPath();
-          ctx.arc(pos.x, pos.y, markerSize + 5, 0, 2 * Math.PI);
-          ctx.stroke();
-          ctx.setLineDash([]);
-          
-          // Add label
-          ctx.font = '12px Arial';
-          ctx.fillStyle = '#000';
-          ctx.textAlign = 'center';
-          ctx.fillText(marker.title, pos.x, pos.y - 15);
-        }
-        
-        // Add distance label if available
-        if (marker.distance !== undefined && marker.distance <= 10) {
-          ctx.font = '10px Arial';
-          ctx.fillStyle = '#555';
-          ctx.textAlign = 'center';
-          ctx.fillText(`${marker.distance.toFixed(1)} km`, pos.x, pos.y + 20);
-        }
-      });
-      
-      // Make markers clickable
-      canvas.onclick = (e) => {
-        const rect = canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-        
-        // Find clicked marker
-        for (const marker of markers) {
-          const pos = coordToCanvas(marker.latitude, marker.longitude);
-          const distance = Math.sqrt(Math.pow(pos.x - x, 2) + Math.pow(pos.y - y, 2));
-          
-          if (distance <= 12) {
-            if (onMarkerClick) {
-              onMarkerClick(marker);
-            }
-            setSelectedMarker(marker);
-            return;
-          }
-        }
-        
-        // If no marker clicked, clear selection
-        setSelectedMarker(null);
-      };
-      
-    } catch (error) {
-      console.error('Error drawing map:', error);
-    }
-  }, [markers, mapInitialized, selectedMarkerId, center, onMarkerClick, userLocation, language]);
-  
+  // Get directions
   const handleGetDirections = () => {
     if (!selectedMarker || !userLocation) return;
     
@@ -269,26 +90,138 @@ const MapView: React.FC<MapViewProps> = ({
     window.open(url, '_blank');
   };
   
+  // Find selected marker when selectedMarkerId changes
+  useEffect(() => {
+    if (selectedMarkerId) {
+      const marker = markers.find(m => m.id === selectedMarkerId);
+      if (marker) {
+        setSelectedMarker(marker);
+      }
+    } else {
+      setSelectedMarker(null);
+    }
+  }, [selectedMarkerId, markers]);
+  
+  // Create custom marker icons based on marker type
+  const createMarkerIcon = (markerType: string, distance?: number, isSelected: boolean = false): L.DivIcon => {
+    const color = getMarkerColor(markerType as any, distance);
+    const size = isSelected ? 14 : 10;
+    const borderWidth = isSelected ? 3 : 2;
+    
+    return L.divIcon({
+      className: 'custom-marker',
+      html: `
+        <div style="
+          width: ${size}px;
+          height: ${size}px;
+          background-color: ${color};
+          border-radius: 50%;
+          border: ${borderWidth}px solid white;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        "></div>
+      `,
+      iconSize: [size + 2*borderWidth, size + 2*borderWidth],
+      iconAnchor: [(size + 2*borderWidth)/2, (size + 2*borderWidth)/2]
+    });
+  };
+  
   return (
-    <div className="relative w-full">
-      <div 
-        ref={mapRef} 
-        className="bg-muted rounded-md border border-gray-300 shadow-inner overflow-hidden" 
-        style={{ height, width: '100%' }}
+    <div className="relative w-full" style={{ height: height }}>
+      <MapContainer
+        center={mapCenter}
+        zoom={10}
+        style={{ height: '100%', width: '100%', borderRadius: '0.375rem' }}
       >
-        {/* Map will be rendered here */}
-        <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
-          {language === 'english' ? 'Loading map...' : 'வரைபடம் ஏற்றப்படுகிறது...'}
-        </div>
-      </div>
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
+        
+        {/* Set map view when center changes */}
+        <SetMapView center={mapCenter} />
+        
+        {/* User location */}
+        {userLocation && (
+          <>
+            <Marker 
+              position={[userLocation.latitude, userLocation.longitude]} 
+              icon={L.divIcon({
+                className: 'user-location-marker',
+                html: `
+                  <div style="
+                    width: 14px;
+                    height: 14px;
+                    background-color: #2196F3;
+                    border-radius: 50%;
+                    border: 3px solid white;
+                    box-shadow: 0 1px 5px rgba(0,0,0,0.3);
+                  ">
+                    <div style="
+                      width: 6px;
+                      height: 6px;
+                      background-color: white;
+                      border-radius: 50%;
+                      margin: 1px;
+                    "></div>
+                  </div>
+                `,
+                iconSize: [20, 20],
+                iconAnchor: [10, 10]
+              })}
+            >
+              <Popup>
+                <b>{language === 'english' ? 'Your Location' : 'உங்கள் இருப்பிடம்'}</b>
+              </Popup>
+            </Marker>
+            
+            {/* Range circle around user */}
+            <Circle
+              center={[userLocation.latitude, userLocation.longitude]}
+              radius={10000} // 10km
+              pathOptions={{ 
+                fillColor: '#2196F3', 
+                fillOpacity: 0.05, 
+                color: '#2196F3',
+                opacity: 0.2,
+                weight: 1
+              }}
+            />
+          </>
+        )}
+        
+        {/* Markers */}
+        {markers.map(marker => (
+          <Marker
+            key={marker.id}
+            position={[marker.latitude, marker.longitude]}
+            icon={createMarkerIcon(marker.type, marker.distance, marker.id === selectedMarkerId)}
+            eventHandlers={{ click: () => handleMarkerClick(marker) }}
+          >
+            <Popup>
+              <div>
+                <b>{marker.title}</b>
+                {marker.info && (
+                  <p className="text-xs whitespace-pre-wrap mt-1">{marker.info}</p>
+                )}
+                {marker.distance !== undefined && (
+                  <p className="text-xs mt-1">
+                    <b>{language === 'english' ? 'Distance:' : 'தூரம்:'}</b> {marker.distance.toFixed(2)} km
+                  </p>
+                )}
+              </div>
+            </Popup>
+          </Marker>
+        ))}
+      </MapContainer>
       
       {/* Instructions overlay for better UX */}
-      <div className="absolute top-2 left-1/2 transform -translate-x-1/2 bg-white/80 py-1 px-3 rounded-full text-sm shadow-md">
+      <div className="absolute top-2 left-1/2 transform -translate-x-1/2 bg-white/80 py-1 px-3 rounded-full text-sm shadow-md z-[1000]">
         {language === 'english' ? 'Click on markers to see details' : 'விவரங்களைக் காண குறிப்பானைக் கிளிக் செய்யவும்'}
       </div>
       
+      {/* Legend */}
       {showLegend && (
-        <div className="absolute top-2 right-2 bg-white/95 p-2 rounded-md shadow-md text-xs border border-gray-200">
+        <div className="absolute top-2 right-2 bg-white/95 p-2 rounded-md shadow-md text-xs border border-gray-200 z-[1000]">
           <div className="font-semibold mb-1">
             {language === 'english' ? 'Legend' : 'விளக்கம்'}
           </div>
@@ -311,8 +244,9 @@ const MapView: React.FC<MapViewProps> = ({
         </div>
       )}
       
+      {/* Selected marker info card */}
       {selectedMarker && (
-        <Card className="absolute left-2 bottom-2 w-56 shadow-md border-2 border-gray-300">
+        <Card className="absolute left-2 bottom-2 w-56 shadow-md border-2 border-gray-300 z-[1000]">
           <CardContent className="p-3 text-xs">
             <h4 className="font-semibold">{selectedMarker.title}</h4>
             {selectedMarker.info && (
