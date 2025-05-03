@@ -14,7 +14,7 @@ const MapLegend: React.FC<MapLegendProps> = ({ show }) => {
   return (
     <div className="absolute top-2 right-2 bg-white/95 p-2 rounded-md shadow-md text-xs border border-gray-200 z-[1000]">
       <div className="font-semibold mb-1">
-        {language === 'english' ? 'Legend' : 'விளக்கம்'}
+        {language === 'english' ? 'Legend' : 'விளக்கப்படம்'}
       </div>
       <div className="flex items-center gap-1">
         <span className="inline-block w-3 h-3 rounded-full bg-wellnet-green"></span>

@@ -5,8 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import AppHeader from '@/components/AppHeader';
 import AppFooter from '@/components/AppFooter';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const Index = () => {
+  const { language } = useLanguage();
+
   return (
     <div className="min-h-screen flex flex-col">
       <AppHeader />
@@ -24,16 +27,18 @@ const Index = () => {
                 உலகம் முழுவதும் நலமான ஆரோக்கியத்திற்கு ஒரு இணைப்பு
               </p>
               <p className="text-xl md:text-2xl mb-8">
-                A connection for better health across the world
+                {language === 'english' 
+                  ? 'A connection for better health across the world'
+                  : 'உலகம் முழுவதும் சிறந்த ஆரோக்கியத்திற்கான இணைப்பு'}
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
                 <Link to="/login">
                   <Button size="lg" className="bg-white text-wellnet-green hover:bg-white/90">
-                    Get Started
+                    {language === 'english' ? 'Get Started' : 'தொடங்குங்கள்'}
                   </Button>
                 </Link>
                 <Button size="lg" variant="outline" className="border-white text-white hover:bg-white/10">
-                  Learn More
+                  {language === 'english' ? 'Learn More' : 'மேலும் அறிய'}
                 </Button>
               </div>
             </div>
@@ -56,7 +61,11 @@ const Index = () => {
         {/* Features Section */}
         <section className="py-16 bg-wellnet-white">
           <div className="container mx-auto px-4">
-            <h2 className="text-3xl font-bold text-center mb-12">Empowering Rural Health with AI</h2>
+            <h2 className="text-3xl font-bold text-center mb-12">
+              {language === 'english' 
+                ? 'Empowering Rural Health with AI' 
+                : 'AI மூலம் கிராமப்புற ஆரோக்கியத்தை மேம்படுத்துதல்'}
+            </h2>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               <Card className="bg-white border border-gray-100 shadow-sm">
@@ -68,9 +77,13 @@ const Index = () => {
                     </svg>
                   </div>
                   
-                  <h3 className="text-xl font-semibold mb-2">Multilingual Support</h3>
+                  <h3 className="text-xl font-semibold mb-2">
+                    {language === 'english' ? 'Multilingual Support' : 'பல்மொழி ஆதரவு'}
+                  </h3>
                   <p className="text-gray-600">
-                    Providing healthcare information in Tamil and English to ensure accessibility for all users.
+                    {language === 'english'
+                      ? 'Providing healthcare information in Tamil and English to ensure accessibility for all users.'
+                      : 'அனைத்து பயனர்களுக்கும் அணுகக்கூடியதாக இருப்பதை உறுதிசெய்ய தமிழ் மற்றும் ஆங்கிலத்தில் சுகாதார தகவல்களை வழங்குதல்.'}
                   </p>
                 </CardContent>
               </Card>
@@ -84,9 +97,13 @@ const Index = () => {
                     </svg>
                   </div>
                   
-                  <h3 className="text-xl font-semibold mb-2">AI Health Assistant</h3>
+                  <h3 className="text-xl font-semibold mb-2">
+                    {language === 'english' ? 'AI Health Assistant' : 'AI ஆரோக்கிய உதவியாளர்'}
+                  </h3>
                   <p className="text-gray-600">
-                    Getting answers to health questions and receiving guidance through our AI-powered assistant.
+                    {language === 'english'
+                      ? 'Getting answers to health questions and receiving guidance through our AI-powered assistant.'
+                      : 'ஆரோக்கியம் தொடர்பான கேள்விகளுக்கு பதில்களைப் பெறுவதும், எங்களின் AI சக்தி வாய்ந்த உதவியாளர் மூலம் வழிகாட்டுதலைப் பெறுவதும்.'}
                   </p>
                 </CardContent>
               </Card>
@@ -101,9 +118,13 @@ const Index = () => {
                     </svg>
                   </div>
                   
-                  <h3 className="text-xl font-semibold mb-2">Location Services</h3>
+                  <h3 className="text-xl font-semibold mb-2">
+                    {language === 'english' ? 'Location Services' : 'இருப்பிட சேவைகள்'}
+                  </h3>
                   <p className="text-gray-600">
-                    Finding nearby Health Sakhis and labs with easy navigation and directions to healthcare providers.
+                    {language === 'english'
+                      ? 'Finding nearby Health Sakhis and labs with easy navigation and directions to healthcare providers.'
+                      : 'அருகிலுள்ள ஆரோக்கிய சகிகளையும், ஆய்வகங்களையும் எளிதாக வழிசெலுத்தலுடன் கண்டறிவதும், சுகாதார வழங்குநர்களுக்கான திசைகளும்.'}
                   </p>
                 </CardContent>
               </Card>
@@ -114,7 +135,11 @@ const Index = () => {
         {/* Role Sections */}
         <section className="py-16 bg-gray-50">
           <div className="container mx-auto px-4">
-            <h2 className="text-3xl font-bold text-center mb-12">For Everyone in the Healthcare Ecosystem</h2>
+            <h2 className="text-3xl font-bold text-center mb-12">
+              {language === 'english'
+                ? 'For Everyone in the Healthcare Ecosystem'
+                : 'சுகாதார சுற்றுச்சூழல் அமைப்பில் உள்ள அனைவருக்கும்'}
+            </h2>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <Card className="bg-white border border-gray-100 shadow-sm">
@@ -128,12 +153,14 @@ const Index = () => {
                     </svg>
                   </div>
                   
-                  <h3 className="text-xl font-semibold mb-3">Coordinators</h3>
+                  <h3 className="text-xl font-semibold mb-3">
+                    {language === 'english' ? 'Coordinators' : 'ஒருங்கிணைப்பாளர்கள்'}
+                  </h3>
                   <ul className="space-y-2 text-gray-600 list-disc pl-5">
-                    <li>Manage Health Sakhis</li>
-                    <li>Monitor coverage areas</li>
-                    <li>View analytics and growth</li>
-                    <li>Identify underserved zones</li>
+                    <li>{language === 'english' ? 'Manage Health Sakhis' : 'ஆரோக்கிய சகிகளை நிர்வகித்தல்'}</li>
+                    <li>{language === 'english' ? 'Monitor coverage areas' : 'காப்பீட்டு பகுதிகளை கண்காணிக்க'}</li>
+                    <li>{language === 'english' ? 'View analytics and growth' : 'பகுப்பாய்வு மற்றும் வளர்ச்சியைப் பார்க்க'}</li>
+                    <li>{language === 'english' ? 'Identify underserved zones' : 'சேவை குறைந்த பகுதிகளை அடையாளம் காண'}</li>
                   </ul>
                 </CardContent>
               </Card>
@@ -146,12 +173,14 @@ const Index = () => {
                     </svg>
                   </div>
                   
-                  <h3 className="text-xl font-semibold mb-3">Health Sakhis</h3>
+                  <h3 className="text-xl font-semibold mb-3">
+                    {language === 'english' ? 'Health Sakhis' : 'ஆரோக்கிய சகிகள்'}
+                  </h3>
                   <ul className="space-y-2 text-gray-600 list-disc pl-5">
-                    <li>Manage customer health records</li>
-                    <li>Access AI health assistant</li>
-                    <li>View nearby customers and labs</li>
-                    <li>Summarize health notes</li>
+                    <li>{language === 'english' ? 'Manage customer health records' : 'வாடிக்கையாளர் ஆரோக்கிய பதிவுகளை நிர்வகிக்க'}</li>
+                    <li>{language === 'english' ? 'Access AI health assistant' : 'AI ஆரோக்கிய உதவியாளரை அணுகவும்'}</li>
+                    <li>{language === 'english' ? 'View nearby customers and labs' : 'அருகிலுள்ள வாடிக்கையாளர்கள் மற்றும் ஆய்வகங்களைப் பார்க்க'}</li>
+                    <li>{language === 'english' ? 'Summarize health notes' : 'ஆரோக்கிய குறிப்புகளை சுருக்கவும்'}</li>
                   </ul>
                 </CardContent>
               </Card>
@@ -165,12 +194,14 @@ const Index = () => {
                     </svg>
                   </div>
                   
-                  <h3 className="text-xl font-semibold mb-3">Customers</h3>
+                  <h3 className="text-xl font-semibold mb-3">
+                    {language === 'english' ? 'Customers' : 'வாடிக்கையாளர்கள்'}
+                  </h3>
                   <ul className="space-y-2 text-gray-600 list-disc pl-5">
-                    <li>Access health records</li>
-                    <li>Chat with AI in Tamil or English</li>
-                    <li>Find nearby labs and health services</li>
-                    <li>View educational health videos</li>
+                    <li>{language === 'english' ? 'Access health records' : 'ஆரோக்கிய பதிவுகளை அணுகவும்'}</li>
+                    <li>{language === 'english' ? 'Chat with AI in Tamil or English' : 'தமிழிலோ அல்லது ஆங்கிலத்திலோ AI உடன் அரட்டை அடிக்கவும்'}</li>
+                    <li>{language === 'english' ? 'Find nearby labs and health services' : 'அருகிலுள்ள ஆய்வகங்கள் மற்றும் சுகாதார சேவைகளைக் கண்டறியவும்'}</li>
+                    <li>{language === 'english' ? 'View educational health videos' : 'கல்வி ஆரோக்கிய வீடியோக்களைப் பார்க்கவும்'}</li>
                   </ul>
                 </CardContent>
               </Card>
@@ -185,12 +216,14 @@ const Index = () => {
                     </svg>
                   </div>
                   
-                  <h3 className="text-xl font-semibold mb-3">Labs</h3>
+                  <h3 className="text-xl font-semibold mb-3">
+                    {language === 'english' ? 'Labs' : 'ஆய்வகங்கள்'}
+                  </h3>
                   <ul className="space-y-2 text-gray-600 list-disc pl-5">
-                    <li>Manage test referrals</li>
-                    <li>View customer locations</li>
-                    <li>Update available services</li>
-                    <li>Track test statuses</li>
+                    <li>{language === 'english' ? 'Manage test referrals' : 'சோதனை பரிந்துரைகளை நிர்வகிக்க'}</li>
+                    <li>{language === 'english' ? 'View customer locations' : 'வாடிக்கையாளர் இருப்பிடங்களைப் பார்க்க'}</li>
+                    <li>{language === 'english' ? 'Update available services' : 'கிடைக்கும் சேவைகளைப் புதுப்பிக்க'}</li>
+                    <li>{language === 'english' ? 'Track test statuses' : 'சோதனை நிலைகளைக் கண்காணிக்க'}</li>
                   </ul>
                 </CardContent>
               </Card>
@@ -201,13 +234,17 @@ const Index = () => {
         {/* Call to Action Section */}
         <section className="py-16 bg-wellnet-green text-white">
           <div className="container mx-auto px-4 text-center">
-            <h2 className="text-3xl font-bold mb-6">Ready to Join WellNet?</h2>
+            <h2 className="text-3xl font-bold mb-6">
+              {language === 'english' ? 'Ready to Join WellNet?' : 'வெல்நெட்டில் சேர தயாரா?'}
+            </h2>
             <p className="text-xl mb-8 max-w-2xl mx-auto">
-              Connect with our health network and access AI-powered healthcare support in your language today.
+              {language === 'english' 
+                ? 'Connect with our health network and access AI-powered healthcare support in your language today.'
+                : 'எங்கள் ஆரோக்கிய நெட்வொர்க்குடன் இணைந்து, உங்கள் மொழியில் AI சக்தி வாய்ந்த சுகாதார ஆதரவை இன்றே அணுகவும்.'}
             </p>
             <Link to="/login">
               <Button size="lg" className="bg-white text-wellnet-green hover:bg-white/90">
-                Get Started Now
+                {language === 'english' ? 'Get Started Now' : 'இப்போதே தொடங்கவும்'}
               </Button>
             </Link>
           </div>

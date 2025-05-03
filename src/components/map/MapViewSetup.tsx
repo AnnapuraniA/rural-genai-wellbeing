@@ -40,7 +40,7 @@ interface MapInstructionsProps {
 export const MapInstructions: React.FC<MapInstructionsProps> = ({ language }) => {
   return (
     <div className="absolute top-2 left-1/2 transform -translate-x-1/2 bg-white/80 py-1 px-3 rounded-full text-sm shadow-md z-[1000]">
-      {language === 'english' ? 'Click on markers to see details' : 'விவரங்களைக் காண குறிப்பானைக் கிளிக் செய்யவும்'}
+      {language === 'english' ? 'Click on markers to see details' : 'விவரங்களைக் காண குறியீடுகளை கிளிக் செய்யவும்'}
     </div>
   );
 };
