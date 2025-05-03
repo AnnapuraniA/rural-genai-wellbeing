@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { 
   getCustomerById, 
   getHealthSakhiById,
@@ -22,13 +23,13 @@ import { useToast } from '@/components/ui/use-toast';
 
 const CustomerDashboard: React.FC = () => {
   const { currentUser } = useAuth();
+  const { language } = useLanguage();
   const [customer, setCustomer] = useState<any>(null);
   const [healthSakhi, setHealthSakhi] = useState<any>(null);
   const [labs, setLabs] = useState<any[]>([]);
   const [markers, setMarkers] = useState<MapMarker[]>([]);
   const [selectedMarker, setSelectedMarker] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [aiLanguage, setAiLanguage] = useState<'english' | 'tamil'>('tamil');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -84,10 +85,10 @@ const CustomerDashboard: React.FC = () => {
 
   const handleTextToSpeech = async (text: string) => {
     try {
-      await textToSpeech(text, aiLanguage);
+      await textToSpeech(text, language);
       toast({
-        title: aiLanguage === 'english' ? 'Text-to-Speech' : 'உரை-முதல்-பேச்சு',
-        description: aiLanguage === 'english' 
+        title: language === 'english' ? 'Text-to-Speech' : 'உரை-முதல்-பேச்சு',
+        description: language === 'english' 
           ? 'Playing audio...' 
           : 'ஆடியோ இயக்கப்படுகிறது...',
       });
@@ -95,7 +96,7 @@ const CustomerDashboard: React.FC = () => {
       console.error('Text-to-speech error:', error);
       toast({
         title: 'Error',
-        description: aiLanguage === 'english' 
+        description: language === 'english' 
           ? 'Failed to play audio. Please try again.' 
           : 'ஆடியோவை இயக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்.',
         variant: 'destructive'
@@ -122,45 +123,36 @@ const CustomerDashboard: React.FC = () => {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">{aiLanguage === 'english' ? 'Customer Dashboard' : 'வாடிக்கையாளர் டாஷ்போர்டு'}</h1>
-        <div className="flex items-center gap-2">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => setAiLanguage(prev => prev === 'english' ? 'tamil' : 'english')}
-          >
-            {aiLanguage === 'english' ? 'தமிழ்' : 'English'}
-          </Button>
-        </div>
+        <h1 className="text-2xl font-bold">{language === 'english' ? 'Customer Dashboard' : 'வாடிக்கையாளர் டாஷ்போர்டு'}</h1>
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">
-              {aiLanguage === 'english' ? 'Your Health Sakhi' : 'உங்கள் ஆரோக்கிய சகி'}
+              {language === 'english' ? 'Your Health Sakhi' : 'உங்கள் ஆரோக்கிய சகி'}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-xl font-semibold">
-              {healthSakhi ? healthSakhi.name : aiLanguage === 'english' ? 'Not Assigned' : 'நியமிக்கப்படவில்லை'}
+              {healthSakhi ? healthSakhi.name : language === 'english' ? 'Not Assigned' : 'நியமிக்கப்படவில்லை'}
             </div>
             {healthSakhi && (
               <>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {aiLanguage === 'english' ? 'Contact:' : 'தொடர்பு:'} {healthSakhi.contactNumber}
+                  {language === 'english' ? 'Contact:' : 'தொடர்பு:'} {healthSakhi.contactNumber}
                 </p>
                 <Button 
                   variant="link" 
                   size="sm" 
                   className="mt-2 p-0 h-auto text-wellnet-green"
                   onClick={() => handleTextToSpeech(
-                    aiLanguage === 'english'
+                    language === 'english'
                       ? `Your Health Sakhi is ${healthSakhi.name}. Contact number is ${healthSakhi.contactNumber}.`
                       : `உங்கள் ஆரோக்கிய சகி ${healthSakhi.name}. தொடர்பு எண் ${healthSakhi.contactNumber}.`
                   )}
                 >
-                  {aiLanguage === 'english' ? '🔊 Listen' : '🔊 கேட்க'}
+                  {language === 'english' ? '🔊 Listen' : '🔊 கேட்க'}
                 </Button>
               </>
             )}
@@ -170,7 +162,7 @@ const CustomerDashboard: React.FC = () => {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">
-              {aiLanguage === 'english' ? 'Nearby Labs' : 'அருகிலுள்ள ஆய்வகங்கள்'}
+              {language === 'english' ? 'Nearby Labs' : 'அருகிலுள்ள ஆய்வகங்கள்'}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -178,7 +170,7 @@ const CustomerDashboard: React.FC = () => {
               {labs.length}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {aiLanguage === 'english' 
+              {language === 'english' 
                 ? 'Labs within 10km of your location' 
                 : 'உங்கள் இருப்பிடத்தில் இருந்து 10கிமீ தொலைவில் உள்ள ஆய்வகங்கள்'}
             </p>
@@ -188,7 +180,7 @@ const CustomerDashboard: React.FC = () => {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">
-              {aiLanguage === 'english' ? 'Medical Records' : 'மருத்துவ பதிவுகள்'}
+              {language === 'english' ? 'Medical Records' : 'மருத்துவ பதிவுகள்'}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -196,7 +188,7 @@ const CustomerDashboard: React.FC = () => {
               {customer.medicalHistory.length}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {aiLanguage === 'english' ? 'Available records' : 'கிடைக்கும் பதிவுகள்'}
+              {language === 'english' ? 'Available records' : 'கிடைக்கும் பதிவுகள்'}
             </p>
           </CardContent>
         </Card>
@@ -208,37 +200,37 @@ const CustomerDashboard: React.FC = () => {
             value="health-assistant" 
             className="data-[state=active]:border-b-2 data-[state=active]:border-wellnet-green rounded-none px-4 py-2"
           >
-            {aiLanguage === 'english' ? 'Health Assistant' : 'ஆரோக்கிய உதவியாளர்'}
+            {language === 'english' ? 'Health Assistant' : 'ஆரோக்கிய உதவியாளர்'}
           </TabsTrigger>
           <TabsTrigger 
             value="map" 
             className="data-[state=active]:border-b-2 data-[state=active]:border-wellnet-green rounded-none px-4 py-2"
           >
-            {aiLanguage === 'english' ? 'Nearby Services' : 'அருகிலுள்ள சேவைகள்'}
+            {language === 'english' ? 'Nearby Services' : 'அருகிலுள்ள சேவைகள்'}
           </TabsTrigger>
           <TabsTrigger 
             value="records" 
             className="data-[state=active]:border-b-2 data-[state=active]:border-wellnet-green rounded-none px-4 py-2"
           >
-            {aiLanguage === 'english' ? 'Medical Records' : 'மருத்துவ பதிவுகள்'}
+            {language === 'english' ? 'Medical Records' : 'மருத்துவ பதிவுகள்'}
           </TabsTrigger>
           <TabsTrigger 
             value="education" 
             className="data-[state=active]:border-b-2 data-[state=active]:border-wellnet-green rounded-none px-4 py-2"
           >
-            {aiLanguage === 'english' ? 'Educational Videos' : 'கல்வி வீடியோக்கள்'}
+            {language === 'english' ? 'Educational Videos' : 'கல்வி வீடியோக்கள்'}
           </TabsTrigger>
         </TabsList>
         
         <TabsContent value="health-assistant" className="pt-4">
-          <AIChat language={aiLanguage} className="h-[600px]" />
+          <AIChat language={language} className="h-[600px]" />
         </TabsContent>
         
         <TabsContent value="map" className="pt-4">
           <Card className="overflow-hidden">
             <CardHeader>
               <CardTitle>
-                {aiLanguage === 'english' ? 'Nearby Health Services' : 'அருகிலுள்ள ஆரோக்கிய சேவைகள்'}
+                {language === 'english' ? 'Nearby Health Services' : 'அருகிலுள்ள ஆரோக்கிய சேவைகள்'}
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
@@ -259,13 +251,13 @@ const CustomerDashboard: React.FC = () => {
           <Card>
             <CardHeader>
               <CardTitle>
-                {aiLanguage === 'english' ? 'Medical Records' : 'மருத்துவ பதிவுகள்'}
+                {language === 'english' ? 'Medical Records' : 'மருத்துவ பதிவுகள்'}
               </CardTitle>
             </CardHeader>
             <CardContent>
               {customer.medicalHistory.length === 0 ? (
                 <div className="text-center py-8">
-                  {aiLanguage === 'english' 
+                  {language === 'english' 
                     ? 'No medical records available yet.' 
                     : 'இன்னும் மருத்துவ பதிவுகள் எதுவும் இல்லை.'}
                 </div>
@@ -277,7 +269,7 @@ const CustomerDashboard: React.FC = () => {
                       <div key={record.id} className="border rounded-md p-4">
                         <div className="flex justify-between items-start mb-3">
                           <h3 className="font-medium">
-                            {aiLanguage === 'english' ? 'Visit' : 'வருகை'} #{index + 1}
+                            {language === 'english' ? 'Visit' : 'வருகை'} #{index + 1}
                           </h3>
                           <div className="text-sm text-muted-foreground">
                             {recordDate.toLocaleDateString()}
@@ -287,14 +279,14 @@ const CustomerDashboard: React.FC = () => {
                         <div className="space-y-2 text-sm">
                           <div>
                             <span className="font-medium">
-                              {aiLanguage === 'english' ? 'Symptoms:' : 'அறிகுறிகள்:'}
+                              {language === 'english' ? 'Symptoms:' : 'அறிகுறிகள்:'}
                             </span> {record.symptoms}
                           </div>
                           
                           {record.diagnosis && (
                             <div>
                               <span className="font-medium">
-                                {aiLanguage === 'english' ? 'Diagnosis:' : 'நோயறிதல்:'}
+                                {language === 'english' ? 'Diagnosis:' : 'நோயறிதல்:'}
                               </span> {record.diagnosis}
                             </div>
                           )}
@@ -302,7 +294,7 @@ const CustomerDashboard: React.FC = () => {
                           {record.prescriptions && (
                             <div>
                               <span className="font-medium">
-                                {aiLanguage === 'english' ? 'Prescription:' : 'மருந்து:'}
+                                {language === 'english' ? 'Prescription:' : 'மருந்து:'}
                               </span> {record.prescriptions}
                             </div>
                           )}
@@ -310,13 +302,13 @@ const CustomerDashboard: React.FC = () => {
                           {record.labTests && record.labTests.length > 0 && (
                             <div className="mt-3">
                               <div className="font-medium mb-1">
-                                {aiLanguage === 'english' ? 'Lab Tests:' : 'ஆய்வக சோதனைகள்:'}
+                                {language === 'english' ? 'Lab Tests:' : 'ஆய்வக சோதனைகள்:'}
                               </div>
                               <ul className="list-disc pl-5 space-y-1">
                                 {record.labTests.map((test: any) => (
                                   <li key={test.id}>
                                     {test.testName} - {
-                                      aiLanguage === 'english' 
+                                      language === 'english' 
                                         ? test.status.charAt(0).toUpperCase() + test.status.slice(1) 
                                         : test.status === 'completed' 
                                           ? 'முடிக்கப்பட்டது' 
@@ -339,12 +331,12 @@ const CustomerDashboard: React.FC = () => {
                           size="sm"
                           className="mt-4"
                           onClick={() => handleTextToSpeech(
-                            `${aiLanguage === 'english' ? 'Visit on' : 'வருகை'} ${recordDate.toLocaleDateString()}. 
-${aiLanguage === 'english' ? 'Symptoms' : 'அறிகுறிகள்'}: ${record.symptoms}.
-${record.diagnosis ? (`${aiLanguage === 'english' ? 'Diagnosis' : 'நோயறிதல்'}: ${record.diagnosis}`) : ''}`
+                            `${language === 'english' ? 'Visit on' : 'வருகை'} ${recordDate.toLocaleDateString()}. 
+${language === 'english' ? 'Symptoms' : 'அறிகுறிகள்'}: ${record.symptoms}.
+${record.diagnosis ? (`${language === 'english' ? 'Diagnosis' : 'நோயறிதல்'}: ${record.diagnosis}`) : ''}`
                           )}
                         >
-                          {aiLanguage === 'english' ? '🔊 Listen' : '🔊 கேட்க'}
+                          {language === 'english' ? '🔊 Listen' : '🔊 கேட்க'}
                         </Button>
                       </div>
                     );
@@ -356,7 +348,7 @@ ${record.diagnosis ? (`${aiLanguage === 'english' ? 'Diagnosis' : 'நோயற�
         </TabsContent>
         
         <TabsContent value="education" className="pt-4">
-          <EducationalVideos language={aiLanguage} />
+          <EducationalVideos language={language} />
         </TabsContent>
       </Tabs>
     </div>

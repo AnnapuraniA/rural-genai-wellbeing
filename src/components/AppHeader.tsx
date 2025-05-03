@@ -1,21 +1,22 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const AppHeader: React.FC = () => {
   const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [language, setLanguage] = useState<'english' | 'tamil'>('english');
+  const { language, setLanguage } = useLanguage();
 
   const handleLogout = () => {
     logout();
     toast({
-      title: 'Logged Out',
-      description: 'You have been successfully logged out.',
+      title: language === 'english' ? 'Logged Out' : 'வெளியேறினார்',
+      description: language === 'english' ? 'You have been successfully logged out.' : 'நீங்கள் வெற்றிகரமாக வெளியேறிவிட்டீர்கள்.',
     });
     navigate('/');
   };
