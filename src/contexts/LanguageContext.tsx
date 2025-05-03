@@ -1,7 +1,7 @@
 
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 
-type Language = 'english' | 'tamil';
+export type Language = 'english' | 'tamil';
 
 interface LanguageContextType {
   language: Language;

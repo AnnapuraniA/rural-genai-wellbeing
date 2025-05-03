@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
-import { useLanguage } from '@/contexts/LanguageContext';
+import { useLanguage, Language } from '@/contexts/LanguageContext';
 
 const AppHeader: React.FC = () => {
   const { currentUser, logout } = useAuth();
@@ -22,7 +22,7 @@ const AppHeader: React.FC = () => {
   };
 
   const toggleLanguage = () => {
-    setLanguage(prev => prev === 'english' ? 'tamil' : 'english');
+    setLanguage(language === 'english' ? 'tamil' : 'english');
   };
 
   // Role-specific dashboard routes
