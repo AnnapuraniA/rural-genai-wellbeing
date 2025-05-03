@@ -9,18 +9,20 @@ import 'leaflet/dist/leaflet.css';
 import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
 import L from 'leaflet';
 
-// Fix for Leaflet marker icons
-// This is needed because Leaflet's default marker icons reference assets that aren't included
-// when bundled with modern build tools
-useEffect(() => {
-  delete (L.Icon.Default.prototype as any)._getIconUrl;
+// Component for fixing Leaflet marker icons
+function FixLeafletMarker() {
+  useEffect(() => {
+    delete (L.Icon.Default.prototype as any)._getIconUrl;
+    
+    L.Icon.Default.mergeOptions({
+      iconRetinaUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png',
+      iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
+      shadowUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png',
+    });
+  }, []);
   
-  L.Icon.Default.mergeOptions({
-    iconRetinaUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png',
-    iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
-    shadowUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png',
-  });
-}, []);
+  return null;
+}
 
 interface MapViewProps {
   markers: MapMarker[];
@@ -132,6 +134,7 @@ const MapView: React.FC<MapViewProps> = ({
         zoom={10}
         style={{ height: '100%', width: '100%', borderRadius: '0.375rem' }}
       >
+        <FixLeafletMarker />
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -144,7 +147,7 @@ const MapView: React.FC<MapViewProps> = ({
         {userLocation && (
           <>
             <Marker 
-              position={[userLocation.latitude, userLocation.longitude]} 
+              position={[userLocation.latitude, userLocation.longitude]}
               icon={L.divIcon({
                 className: 'user-location-marker',
                 html: `
@@ -177,7 +180,6 @@ const MapView: React.FC<MapViewProps> = ({
             {/* Range circle around user */}
             <Circle
               center={[userLocation.latitude, userLocation.longitude]}
-              radius={10000} // 10km
               pathOptions={{ 
                 fillColor: '#2196F3', 
                 fillOpacity: 0.05, 
@@ -185,6 +187,7 @@ const MapView: React.FC<MapViewProps> = ({
                 opacity: 0.2,
                 weight: 1
               }}
+              radius={10000} // 10km
             />
           </>
         )}
@@ -195,7 +198,9 @@ const MapView: React.FC<MapViewProps> = ({
             key={marker.id}
             position={[marker.latitude, marker.longitude]}
             icon={createMarkerIcon(marker.type, marker.distance, marker.id === selectedMarkerId)}
-            eventHandlers={{ click: () => handleMarkerClick(marker) }}
+            eventHandlers={{ 
+              click: () => handleMarkerClick(marker) 
+            }}
           >
             <Popup>
               <div>
