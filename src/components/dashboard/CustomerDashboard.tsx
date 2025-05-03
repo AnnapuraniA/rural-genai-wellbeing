@@ -340,8 +340,8 @@ const CustomerDashboard: React.FC = () => {
                           className="mt-4"
                           onClick={() => handleTextToSpeech(
                             `${aiLanguage === 'english' ? 'Visit on' : 'வருகை'} ${recordDate.toLocaleDateString()}. 
-                            ${aiLanguage === 'english' ? 'Symptoms' : 'அறிகுறிகள்}: ${record.symptoms}.
-                            ${record.diagnosis ? (`${aiLanguage === 'english' ? 'Diagnosis' : 'நோயறிதல்'}: ${record.diagnosis}`) : ''}`
+${aiLanguage === 'english' ? 'Symptoms' : 'அறிகுறிகள்'}: ${record.symptoms}.
+${record.diagnosis ? (`${aiLanguage === 'english' ? 'Diagnosis' : 'நோயறிதல்'}: ${record.diagnosis}`) : ''}`
                           )}
                         >
                           {aiLanguage === 'english' ? '🔊 Listen' : '🔊 கேட்க'}
