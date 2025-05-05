@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 import LoginForm from '@/components/LoginForm';
@@ -9,7 +8,6 @@ import { useAuth } from '@/contexts/AuthContext';
 const Login = () => {
   const { currentUser, isLoading } = useAuth();
 
-  // If user is already logged in, redirect to their dashboard
   if (!isLoading && currentUser) {
     const dashboardRoute = (() => {
       switch (currentUser.role) {
@@ -52,6 +50,16 @@ const Login = () => {
           
           <div className="bg-card border rounded-lg shadow-sm p-6">
             <LoginForm />
+          </div>
+          
+          <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <h3 className="text-sm font-medium text-blue-800 mb-2">Demo Login Credentials</h3>
+            <div className="space-y-2 text-sm text-blue-700">
+              <p><span className="font-medium">Coordinator:</span> coordinator / password123</p>
+              <p><span className="font-medium">Health Sakhi:</span> sakhi / password123</p>
+              <p><span className="font-medium">Customer:</span> customer / password123</p>
+              <p><span className="font-medium">Lab:</span> lab / password123</p>
+            </div>
           </div>
         </div>
       </main>

@@ -1,4 +1,3 @@
-
 // This file simulates a database with TypeScript types and dummy data
 
 export interface User {
@@ -477,6 +476,13 @@ export const getCustomersByHealthSakhiId = (healthSakhiId: string): Customer[] =
 export const getNearbyLabs = (latitude: number, longitude: number, radiusInKm: number): Lab[] => {
   return dummyData.labs.filter(lab => {
     const distance = calculateDistanceInKm(latitude, longitude, lab.latitude, lab.longitude);
+    return distance <= radiusInKm;
+  });
+};
+
+export const getNearbyCustomers = (latitude: number, longitude: number, radiusInKm: number): Customer[] => {
+  return dummyData.customers.filter(customer => {
+    const distance = calculateDistanceInKm(latitude, longitude, customer.latitude, customer.longitude);
     return distance <= radiusInKm;
   });
 };

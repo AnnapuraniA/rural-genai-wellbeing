@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
@@ -7,7 +6,7 @@ import { summarizeNotes } from '@/lib/aiServices';
 import { useToast } from '@/components/ui/use-toast';
 
 interface NoteSummarizerProps {
-  language: 'tamil' | 'english';
+  language: 'english' | 'tamil';
 }
 
 const NoteSummarizer: React.FC<NoteSummarizerProps> = ({ language }) => {

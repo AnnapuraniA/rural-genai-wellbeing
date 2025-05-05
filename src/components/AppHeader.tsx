@@ -1,28 +1,22 @@
-
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
-import { useLanguage, Language } from '@/contexts/LanguageContext';
+import { LanguageSelector } from './LanguageSelector';
 
 const AppHeader: React.FC = () => {
   const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { language, setLanguage } = useLanguage();
 
   const handleLogout = () => {
     logout();
     toast({
-      title: language === 'english' ? 'Logged Out' : 'வெளியேறினார்',
-      description: language === 'english' ? 'You have been successfully logged out.' : 'நீங்கள் வெற்றிகரமாக வெளியேறிவிட்டீர்கள்.',
+      title: 'Logged Out',
+      description: 'You have been successfully logged out.',
     });
     navigate('/');
-  };
-
-  const toggleLanguage = () => {
-    setLanguage(language === 'english' ? 'tamil' : 'english');
   };
 
   // Role-specific dashboard routes
@@ -61,35 +55,25 @@ const AppHeader: React.FC = () => {
         <div className="flex items-center gap-4">
           {currentUser && (
             <Link to={getDashboardRoute()}>
-              <Button variant="outline" className="text-white border-white hover:bg-white/20">
-                {language === 'english' ? 'Dashboard' : 'டாஷ்போர்டு'}
+              <Button 
+                variant="secondary" 
+                className="bg-white text-wellnet-green hover:bg-white/90"
+              >
+                Dashboard
               </Button>
             </Link>
           )}
           
-          <Button 
-            variant="ghost" 
-            size="sm"
-            onClick={toggleLanguage}
-            className="text-white hover:bg-white/20"
-          >
-            {language === 'english' ? 'தமிழ்' : 'English'}
-          </Button>
+          <LanguageSelector />
           
-          {currentUser ? (
+          {currentUser && (
             <Button 
               variant="secondary" 
               onClick={handleLogout}
               className="bg-white text-wellnet-green hover:bg-white/90"
             >
-              {language === 'english' ? 'Logout' : 'வெளியேறு'}
+              Logout
             </Button>
-          ) : (
-            <Link to="/login">
-              <Button className="bg-white text-wellnet-green hover:bg-white/90">
-                {language === 'english' ? 'Login' : 'உள்நுழைய'}
-              </Button>
-            </Link>
           )}
         </div>
       </div>

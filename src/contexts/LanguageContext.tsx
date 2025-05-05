@@ -1,29 +1,30 @@
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import i18n from '../i18n/i18n';
 
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+type Language = 'english' | 'tamil';
 
-export type Language = 'english' | 'tamil';
-
-interface LanguageContextType {
+type LanguageContextType = {
   language: Language;
-  setLanguage: (language: Language) => void;
-}
+  setLanguage: (lang: Language) => void;
+};
 
-const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
+const LanguageContext = createContext<LanguageContextType>({
+  language: 'english',
+  setLanguage: () => {},
+});
 
-export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [language, setLanguage] = useState<Language>('english');
+export const useLanguage = () => useContext(LanguageContext);
+
+export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [language, setLanguage] = useState<Language>(i18n.language === 'en' ? 'english' : 'tamil');
+
+  useEffect(() => {
+    i18n.changeLanguage(language === 'english' ? 'en' : 'ta');
+  }, [language]);
 
   return (
     <LanguageContext.Provider value={{ language, setLanguage }}>
       {children}
     </LanguageContext.Provider>
   );
-}
-
-export function useLanguage() {
-  const context = useContext(LanguageContext);
-  if (context === undefined) {
-    throw new Error('useLanguage must be used within a LanguageProvider');
-  }
-  return context;
-}
+};

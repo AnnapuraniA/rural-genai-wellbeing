@@ -1,4 +1,3 @@
-
 // This file contains mock AI services that simulate the functionality
 // In a real application, these would connect to actual AI APIs
 
@@ -121,27 +120,92 @@ export const summarizeNotes = async (text: string, language: 'tamil' | 'english'
   const sourceLanguage = detectLanguage(text);
   let summary = '';
   
-  // Very basic summarization - just takes first few words and adds summary text
-  if (text.length > 100) {
-    summary = text.substring(0, 100) + '...';
-  } else {
-    summary = text;
+  // Split text into sentences
+  const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
+  
+  if (sentences.length === 0) {
+    return language === 'english' ? 'No text to summarize.' : 'சுருக்க வேண்டிய உரை இல்லை.';
+  }
+  
+  // Extract key points (first sentence and any sentence containing important keywords)
+  const importantKeywords = language === 'english' 
+    ? ['important', 'key', 'critical', 'urgent', 'severe', 'serious', 'warning', 'note']
+    : ['முக்கிய', 'குறிப்பு', 'அவசர', 'கடுமையான', 'எச்சரிக்கை'];
+    
+  const keyPoints = sentences.filter(sentence => {
+    const lowerSentence = sentence.toLowerCase();
+    return importantKeywords.some(keyword => lowerSentence.includes(keyword));
+  });
+  
+  // Always include first sentence for context
+  if (!keyPoints.includes(sentences[0])) {
+    keyPoints.unshift(sentences[0]);
+  }
+  
+  // Combine key points into summary
+  summary = keyPoints.join('. ') + '.';
+  
+  // If summary is too long, truncate it
+  if (summary.length > 300) {
+    summary = summary.substring(0, 297) + '...';
   }
   
   const result = language === 'english'
-    ? `Summary: ${summary}`
-    : `சுருக்கம்: ${summary}`;
+    ? `Summary:\n${summary}`
+    : `சுருக்கம்:\n${summary}`;
     
   return result;
 };
 
 // Text to speech (mock)
-export const textToSpeech = async (text: string, language: 'tamil' | 'english' = 'english'): Promise<string> => {
-  await simulateDelay(800); // Simulate API delay
-  
-  // In a real implementation, this would return an audio URL or blob
-  // For this mock, we'll return a message indicating success
-  return `Text-to-speech processing complete for "${text}" in ${language}`;
+export const textToSpeech = async (text: string, language: 'english' | 'tamil' = 'english'): Promise<void> => {
+  try {
+    // Check if the browser supports the Web Speech API
+    if (!('speechSynthesis' in window)) {
+      throw new Error('Text-to-speech is not supported in this browser');
+    }
+
+    // Create a new speech synthesis utterance
+    const utterance = new SpeechSynthesisUtterance(text);
+    
+    // Set voice based on language
+    const voices = window.speechSynthesis.getVoices();
+    
+    if (language === 'tamil') {
+      // Try to find a Tamil voice
+      const tamilVoice = voices.find(voice => 
+        voice.lang.includes('ta') || voice.lang.includes('ta-IN')
+      );
+      if (tamilVoice) {
+        utterance.voice = tamilVoice;
+      }
+    } else {
+      // Default to English voice
+      const englishVoice = voices.find(voice => 
+        voice.lang.includes('en') || voice.lang.includes('en-US')
+      );
+      if (englishVoice) {
+        utterance.voice = englishVoice;
+      }
+    }
+
+    // Set other properties
+    utterance.rate = 1.0; // Normal speed
+    utterance.pitch = 1.0; // Normal pitch
+    utterance.volume = 1.0; // Full volume
+
+    // Speak the text
+    window.speechSynthesis.speak(utterance);
+
+    // Return a promise that resolves when the speech is complete
+    return new Promise((resolve, reject) => {
+      utterance.onend = () => resolve();
+      utterance.onerror = (error) => reject(error);
+    });
+  } catch (error) {
+    console.error('Text-to-speech error:', error);
+    throw error;
+  }
 };
 
 // Get recommended educational videos

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Marker, Popup } from 'react-leaflet';
 import { MapMarker } from '@/lib/mapServices';
@@ -23,10 +22,7 @@ const createMarkerIcon = (markerType: string, distance?: number, isSelected: boo
         if (dist <= 5) return '#FF9800'; // Orange
         return '#F44336'; // Red
       case 'customer':
-        if (dist === undefined) return '#2196F3'; // Default Blue
-        if (dist <= 2) return '#4CAF50'; // Green
-        if (dist <= 5) return '#FF9800'; // Orange
-        return '#F44336'; // Red
+        return '#2196F3'; // Always Blue
       case 'lab':
         return '#FFCA28'; // Golden Yellow
       default:
@@ -35,8 +31,9 @@ const createMarkerIcon = (markerType: string, distance?: number, isSelected: boo
   };
 
   const color = getMarkerColor(markerType, distance);
-  const size = isSelected ? 14 : 10;
-  const borderWidth = isSelected ? 3 : 2;
+  // Make lab markers larger than other markers
+  const size = markerType === 'lab' ? 20 : (isSelected ? 16 : 12);
+  const borderWidth = markerType === 'lab' ? 4 : (isSelected ? 3 : 2);
   
   return L.divIcon({
     className: 'custom-marker',
@@ -47,7 +44,9 @@ const createMarkerIcon = (markerType: string, distance?: number, isSelected: boo
         background-color: ${color};
         border-radius: 50%;
         border: ${borderWidth}px solid white;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        transition: all 0.2s ease;
+        ${markerType === 'lab' ? 'box-shadow: 0 0 0 2px rgba(0,0,0,0.2);' : ''}
       "></div>
     `,
     iconSize: [size + 2*borderWidth, size + 2*borderWidth],
@@ -69,16 +68,23 @@ const MapMarkers: React.FC<MapMarkersProps> = ({ markers, onMarkerClick, selecte
             click: () => onMarkerClick(marker) 
           }}
         >
-          <Popup>
-            <div>
-              <b>{marker.title}</b>
+          <Popup className="custom-popup">
+            <div className="p-2">
+              <h4 className="font-semibold text-sm">{marker.title}</h4>
               {marker.info && (
-                <p className="text-xs whitespace-pre-wrap mt-1">{marker.info}</p>
+                <div className="text-xs text-gray-600 mt-1 whitespace-pre-wrap">
+                  {marker.info}
+                </div>
               )}
               {marker.distance !== undefined && (
-                <p className="text-xs mt-1">
-                  <b>{language === 'english' ? 'Distance:' : 'தூரம்:'}</b> {marker.distance.toFixed(2)} km
-                </p>
+                <div className="text-xs mt-1">
+                  <span className="font-medium">
+                    {language === 'english' ? 'Distance:' : 'தூரம்:'}
+                  </span>{' '}
+                  <span className="text-gray-600">
+                    {marker.distance.toFixed(1)} km
+                  </span>
+                </div>
               )}
             </div>
           </Popup>

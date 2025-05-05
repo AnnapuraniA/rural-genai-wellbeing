@@ -1,0 +1,91 @@
+{
+  "common": {
+    "home": "Home",
+    "about": "About",
+    "contact": "Contact",
+    "login": "Login",
+    "logout": "Logout",
+    "dashboard": "Dashboard",
+    "language": "Language",
+    "english": "English",
+    "tamil": "Tamil"
+  },
+  "header": {
+    "title": "Rural GenAI Wellbeing",
+    "changeLanguage": "Change Language"
+  },
+  "auth": {
+    "signIn": "Sign In",
+    "signUp": "Sign Up",
+    "username": "Username",
+    "password": "Password",
+    "forgotPassword": "Forgot Password?",
+    "rememberMe": "Remember me",
+    "dontHaveAccount": "Don't have an account?",
+    "createAccount": "Create Account",
+    "loginError": "Invalid username or password",
+    "loginSuccess": "Successfully logged in"
+  },
+  "dashboard": {
+    "welcome": "Welcome to your dashboard",
+    "profile": "Profile",
+    "settings": "Settings",
+    "notifications": "Notifications",
+    "loading": "Loading dashboard...",
+    "notFound": "Data not found",
+    "error": "Error loading data"
+  },
+  "sakhi": {
+    "name": "Name",
+    "village": "Village",
+    "customers": "Customers",
+    "services": "Services",
+    "status": "Status",
+    "active": "Active",
+    "inactive": "Inactive",
+    "totalCustomers": "Total Customers",
+    "areaCoverage": "Area Coverage",
+    "customerGrowth": "Customer Growth",
+    "nearbyLabs": "Nearby Labs",
+    "mapView": "Map View",
+    "customerList": "Customer List",
+    "aiTools": "AI Tools",
+    "educationalVideos": "Educational Videos"
+  },
+  "lab": {
+    "dashboard": "Lab Dashboard",
+    "testRequests": "Test Requests",
+    "pendingRequests": "Pending requests",
+    "todaysTests": "Today's Tests",
+    "scheduledToday": "Scheduled for today",
+    "pendingResults": "Pending Results",
+    "resultsToDeliver": "Results to be delivered",
+    "recentRequests": "Recent Test Requests",
+    "comingSoon": "Lab dashboard functionalities coming soon!"
+  },
+  "customer": {
+    "dashboard": "Customer Dashboard",
+    "healthSakhi": "Your Health Sakhi",
+    "notAssigned": "Not Assigned",
+    "contact": "Contact",
+    "nearbyLabs": "Nearby Labs",
+    "labsWithin": "Labs within 10km of your location",
+    "medicalRecords": "Medical Records",
+    "availableRecords": "Available records",
+    "healthAssistant": "Health Assistant",
+    "nearbyServices": "Nearby Services",
+    "educationalVideos": "Educational Videos",
+    "noRecords": "No medical records available yet",
+    "visit": "Visit",
+    "symptoms": "Symptoms",
+    "diagnosis": "Diagnosis",
+    "prescription": "Prescription",
+    "labTests": "Lab Tests",
+    "completed": "Completed",
+    "scheduled": "Scheduled",
+    "listen": "🔊 Listen",
+    "textToSpeech": "Text-to-Speech",
+    "playingAudio": "Playing audio...",
+    "audioError": "Failed to play audio. Please try again."
+  }
+} 

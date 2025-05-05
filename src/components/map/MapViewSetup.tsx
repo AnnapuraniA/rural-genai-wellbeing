@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { useMap } from 'react-leaflet';
 import L from 'leaflet';
@@ -34,7 +33,7 @@ export const FixLeafletMarker: React.FC = () => {
 };
 
 interface MapInstructionsProps {
-  language: string;
+  language: 'english' | 'tamil';
 }
 
 export const MapInstructions: React.FC<MapInstructionsProps> = ({ language }) => {
