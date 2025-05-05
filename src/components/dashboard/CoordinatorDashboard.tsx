@@ -22,7 +22,6 @@ import {
 } from '@/lib/mapServices';
 import MapView from '@/components/MapView';
 import HealthSakhiAnalyzer from '@/components/HealthSakhiAnalyzer';
-import EducationalVideos from '@/components/EducationalVideos';
 import ConcentricCircles from '@/components/map/ConcentricCircles';
 import { ErrorBoundary } from 'react-error-boundary';
 
@@ -201,9 +200,6 @@ const CoordinatorDashboard: React.FC = () => {
           <TabsTrigger value="analysis">
             {language === 'english' ? 'Health Sakhi Analysis' : 'ஆரோக்கிய சகி பகுப்பாய்வு'}
           </TabsTrigger>
-          <TabsTrigger value="videos">
-            {language === 'english' ? 'Videos' : 'வீடியோக்கள்'}
-          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="map" className="pt-4">
@@ -256,19 +252,6 @@ const CoordinatorDashboard: React.FC = () => {
                 onSakhiSelect={handleSakhiClick}
                 selectedSakhi={selectedSakhi}
               />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="videos" className="pt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>
-                {language === 'english' ? 'Educational Videos' : 'கல்வி வீடியோக்கள்'}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <EducationalVideos language={language} />
             </CardContent>
           </Card>
         </TabsContent>

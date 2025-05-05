@@ -1,4 +1,3 @@
-
 import { Coordinator, Customer, Lab, HealthSakhi, calculateDistanceInKm } from './database';
 
 // Define map marker types

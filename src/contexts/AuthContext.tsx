@@ -1,5 +1,5 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
-import { User, getUserByCredentials, saveAuthToLocalStorage, getAuthFromLocalStorage, clearAuthFromLocalStorage } from '@/lib/database';
+import { User, getUserByCredentials, saveAuthToLocalStorage, getAuthFromLocalStorage, clearAuthFromLocalStorage, initializeDatabase } from '@/lib/database';
 
 interface AuthContextType {
   currentUser: User | null;
@@ -15,19 +15,23 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
+    // Initialize database
+    initializeDatabase();
+    
+    // Get user from localStorage
     const user = getAuthFromLocalStorage();
     setCurrentUser(user);
     setIsLoading(false);
   }, []);
 
   const login = async (username: string, password: string) => {
-    const user = getUserByCredentials(username, password);
-    if (user) {
-      setCurrentUser(user);
-      saveAuthToLocalStorage(user);
-      return true;
-    }
-    return false;
+      const user = getUserByCredentials(username, password);
+      if (user) {
+        setCurrentUser(user);
+        saveAuthToLocalStorage(user);
+        return true;
+      }
+      return false;
   };
 
   const logout = () => {

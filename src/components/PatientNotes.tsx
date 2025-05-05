@@ -16,9 +16,9 @@ interface PatientNotesProps {
 interface Note {
   id: string;
   customerId: string;
+  type: 'observation' | 'followup' | 'test_result';
   content: string;
   timestamp: Date;
-  type: 'observation' | 'followup' | 'test_result';
 }
 
 const PatientNotes: React.FC<PatientNotesProps> = ({
@@ -27,9 +27,9 @@ const PatientNotes: React.FC<PatientNotesProps> = ({
   language
 }) => {
   const [selectedCustomer, setSelectedCustomer] = useState<string>('');
+  const [noteType, setNoteType] = useState<'observation' | 'followup' | 'test_result'>('observation');
   const [notes, setNotes] = useState<Note[]>([]);
   const [newNote, setNewNote] = useState('');
-  const [noteType, setNoteType] = useState<'observation' | 'followup' | 'test_result'>('observation');
 
   const handleAddNote = () => {
     if (!newNote.trim() || !selectedCustomer) return;
@@ -37,29 +37,31 @@ const PatientNotes: React.FC<PatientNotesProps> = ({
     const note: Note = {
       id: Date.now().toString(),
       customerId: selectedCustomer,
+      type: noteType,
       content: newNote,
-      timestamp: new Date(),
-      type: noteType
+      timestamp: new Date()
     };
 
-    setNotes(prev => [...prev, note]);
+    setNotes(prev => [note, ...prev]);
     setNewNote('');
   };
 
   const getNoteTypeLabel = (type: Note['type']) => {
-    if (language === 'english') {
-      switch (type) {
-        case 'observation': return 'Observation';
-        case 'followup': return 'Follow-up';
-        case 'test_result': return 'Test Result';
+    const labels = {
+      observation: {
+        english: 'Observation',
+        tamil: 'கவனிப்பு'
+      },
+      followup: {
+        english: 'Follow-up',
+        tamil: 'தொடர்தல்'
+      },
+      test_result: {
+        english: 'Test Result',
+        tamil: 'சோதனை முடிவு'
       }
-    } else {
-      switch (type) {
-        case 'observation': return 'கவனிப்பு';
-        case 'followup': return 'தொடர்தல்';
-        case 'test_result': return 'சோதனை முடிவு';
-      }
-    }
+    };
+    return labels[type][language];
   };
 
   const getCustomerNotes = (customerId: string) => {
@@ -71,7 +73,7 @@ const PatientNotes: React.FC<PatientNotesProps> = ({
       <div className="grid grid-cols-2 gap-4">
         <Select value={selectedCustomer} onValueChange={setSelectedCustomer}>
           <SelectTrigger>
-            <SelectValue placeholder={language === 'english' ? 'Select Patient' : 'நோயாளியை தேர்வு செய்க'} />
+            <SelectValue placeholder={language === 'english' ? 'Select Patient' : 'நோயாளியைத் தேர்வு செய்க'} />
           </SelectTrigger>
           <SelectContent>
             {customers.map(customer => (
@@ -84,7 +86,7 @@ const PatientNotes: React.FC<PatientNotesProps> = ({
 
         <Select value={noteType} onValueChange={(value: Note['type']) => setNoteType(value)}>
           <SelectTrigger>
-            <SelectValue placeholder={language === 'english' ? 'Note Type' : 'குறிப்பு வகை'} />
+            <SelectValue placeholder={language === 'english' ? 'Select Note Type' : 'குறிப்பு வகையைத் தேர்வு செய்க'} />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="observation">
@@ -100,43 +102,52 @@ const PatientNotes: React.FC<PatientNotesProps> = ({
         </Select>
       </div>
 
-      {selectedCustomer && (
-        <>
-          <Card>
-            <CardContent className="p-4">
-              <ScrollArea className="h-[400px] pr-4">
-                <div className="space-y-4">
-                  {getCustomerNotes(selectedCustomer).map(note => (
-                    <div key={note.id} className="bg-muted rounded-lg p-4">
-                      <div className="flex justify-between items-start mb-2">
-                        <span className="text-sm font-medium">
-                          {getNoteTypeLabel(note.type)}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {note.timestamp.toLocaleString()}
-                        </span>
-                      </div>
-                      <p className="text-sm whitespace-pre-wrap">{note.content}</p>
+      <Card>
+        <CardContent className="p-4">
+          <ScrollArea className="h-[400px] pr-4">
+            <div className="space-y-4">
+              {selectedCustomer ? (
+                getCustomerNotes(selectedCustomer).map(note => (
+                  <div key={note.id} className="border rounded-lg p-4">
+                    <div className="flex justify-between items-start mb-2">
+                      <span className="font-medium">
+                        {getNoteTypeLabel(note.type)}
+                      </span>
+                      <span className="text-sm text-gray-500">
+                        {note.timestamp.toLocaleString()}
+                      </span>
                     </div>
-                  ))}
-                </div>
-              </ScrollArea>
-            </CardContent>
-          </Card>
+                    <p className="text-gray-700">{note.content}</p>
+                  </div>
+                ))
+              ) : (
+                <p className="text-center text-gray-500">
+                  {language === 'english' 
+                    ? 'Select a patient to view their notes' 
+                    : 'நோயாளியின் குறிப்புகளைக் காண ஒரு நோயாளியைத் தேர்வு செய்க'}
+                </p>
+              )}
+            </div>
+          </ScrollArea>
+        </CardContent>
+      </Card>
 
-          <div className="flex gap-2">
-            <Textarea
-              value={newNote}
-              onChange={(e) => setNewNote(e.target.value)}
-              placeholder={language === 'english' ? 'Add a new note...' : 'புதிய குறிப்பை சேர்க்க...'}
-              className="flex-1"
-            />
-            <Button onClick={handleAddNote}>
-              {language === 'english' ? 'Add Note' : 'குறிப்பை சேர்க்க'}
-            </Button>
-          </div>
-        </>
-      )}
+      <div className="flex gap-2">
+        <Input
+          value={newNote}
+          onChange={(e) => setNewNote(e.target.value)}
+          placeholder={language === 'english' 
+            ? 'Add a new note...' 
+            : 'புதிய குறிப்பைச் சேர்க்கவும்...'}
+          onKeyPress={(e) => e.key === 'Enter' && handleAddNote()}
+        />
+        <Button 
+          onClick={handleAddNote}
+          disabled={!selectedCustomer || !newNote.trim()}
+        >
+          {language === 'english' ? 'Add Note' : 'குறிப்பைச் சேர்க்க'}
+        </Button>
+      </div>
     </div>
   );
 };

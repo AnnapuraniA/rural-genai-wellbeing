@@ -19,13 +19,13 @@ const LoginForm: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const success = await login(username, password);
-    
-    if (success) {
-      toast({
+      const success = await login(username, password);
+      
+      if (success) {
+        toast({
         title: t('auth.loginSuccess'),
-        variant: 'default',
-      });
+          variant: 'default',
+        });
       
       const user = JSON.parse(localStorage.getItem('wellnet_user') || 'null');
       if (user) {

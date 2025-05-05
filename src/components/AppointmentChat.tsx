@@ -15,7 +15,7 @@ interface AppointmentChatProps {
 
 interface Message {
   id: string;
-  sender: 'user' | 'assistant';
+  sender: 'user' | 'ai';
   content: string;
   timestamp: Date;
 }
@@ -25,74 +25,66 @@ const AppointmentChat: React.FC<AppointmentChatProps> = ({
   customers,
   language
 }) => {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<string>('');
   const [appointmentType, setAppointmentType] = useState<'doctor' | 'lab'>('doctor');
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [inputMessage, setInputMessage] = useState('');
 
-  const handleSend = async () => {
-    if (!input.trim()) return;
+  const handleSendMessage = () => {
+    if (!inputMessage.trim()) return;
 
+    // Add user message
     const userMessage: Message = {
       id: Date.now().toString(),
       sender: 'user',
-      content: input,
+      content: inputMessage,
       timestamp: new Date()
     };
 
     setMessages(prev => [...prev, userMessage]);
-    setInput('');
+    setInputMessage('');
 
     // Simulate AI response
-    const response = await simulateAIResponse(input, appointmentType, language);
-    
-    const assistantMessage: Message = {
-      id: (Date.now() + 1).toString(),
-      sender: 'assistant',
-      content: response,
-      timestamp: new Date()
-    };
-
-    setMessages(prev => [...prev, assistantMessage]);
+    setTimeout(() => {
+      const aiResponse = generateAIResponse(inputMessage);
+      const aiMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        sender: 'ai',
+        content: aiResponse,
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, aiMessage]);
+    }, 1000);
   };
 
-  const simulateAIResponse = async (
-    input: string,
-    type: 'doctor' | 'lab',
-    language: 'english' | 'tamil'
-  ): Promise<string> => {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
+  const generateAIResponse = (message: string): string => {
+    // This is a simple response generator. In a real app, this would call an AI API
     const responses = {
-      doctor: {
-        english: [
-          "I've checked the doctor's availability. They are available on Monday at 2 PM. Would you like to schedule this appointment?",
-          "The doctor is fully booked for tomorrow. The next available slot is on Wednesday at 10 AM.",
-          "I've scheduled your appointment with Dr. Kumar for Friday at 3 PM. You'll receive a confirmation message shortly."
-        ],
-        tamil: [
-          "மருத்துவர் கிடைக்கும் நேரத்தை சரிபார்த்தேன். திங்கட்கிழமை மதியம் 2 மணிக்கு கிடைக்கிறார்கள். இந்த நேரத்தை பதிவு செய்ய விரும்புகிறீர்களா?",
-          "நாளை மருத்துவர் முழுவதும் பதிவு செய்யப்பட்டுள்ளது. அடுத்த கிடைக்கும் நேரம் புதன்கிழமை காலை 10 மணி.",
-          "உங்கள் நேரம் பதிவு செய்யப்பட்டுள்ளது. வெள்ளிக்கிழமை மாலை 3 மணிக்கு டாக்டர் குமாரை சந்திக்கலாம். உறுதிப்படுத்தும் செய்தி விரைவில் கிடைக்கும்."
-        ]
+      english: {
+        greeting: "Hello! I can help you schedule an appointment. Please select a customer and appointment type.",
+        doctor: "I'll help you schedule a doctor's appointment. What date and time would you prefer?",
+        lab: "I'll help you schedule a lab test. What type of test does the patient need?",
+        default: "I understand. How can I help you further?"
       },
-      lab: {
-        english: [
-          "The lab is available for blood tests tomorrow between 9 AM and 12 PM. Would you like to schedule this?",
-          "The lab is currently processing a high volume of tests. The next available slot is on Thursday at 11 AM.",
-          "I've scheduled your lab test for Tuesday at 10 AM. Please bring your health card and any previous test results."
-        ],
-        tamil: [
-          "நாளை காலை 9 மணி முதல் மதியம் 12 மணி வரை ஆய்வகம் கிடைக்கிறது. இந்த நேரத்தை பதிவு செய்ய விரும்புகிறீர்களா?",
-          "தற்போது ஆய்வகத்தில் அதிக அளவு சோதனைகள் நடைபெற்று வருகின்றன. அடுத்த கிடைக்கும் நேரம் வியாழக்கிழமை காலை 11 மணி.",
-          "உங்கள் ஆய்வக சோதனை செவ்வாய்க்கிழமை காலை 10 மணிக்கு பதிவு செய்யப்பட்டுள்ளது. உங்கள் சுகாதார அட்டை மற்றும் முந்தைய சோதனை முடிவுகளை கொண்டு வாருங்கள்."
-        ]
+      tamil: {
+        greeting: "வணக்கம்! நான் நேரம் பதிவு செய்ய உதவுகிறேன். தயவுசெய்து ஒரு வாடிக்கையாளரையும் நேரம் வகையையும் தேர்வு செய்யவும்.",
+        doctor: "நான் மருத்துவர் நேரம் பதிவு செய்ய உதவுகிறேன். எந்த தேதி மற்றும் நேரத்தை விரும்புகிறீர்கள்?",
+        lab: "நான் ஆய்வக சோதனைக்கான நேரம் பதிவு செய்ய உதவுகிறேன். நோயாளிக்கு என்ன வகையான சோதனை தேவை?",
+        default: "புரிந்துகொண்டேன். மேலும் எப்படி உதவ முடியும்?"
       }
     };
 
-    const typeResponses = responses[type][language];
-    return typeResponses[Math.floor(Math.random() * typeResponses.length)];
+    const lang = language === 'english' ? 'english' : 'tamil';
+    
+    if (message.toLowerCase().includes('hello') || message.toLowerCase().includes('hi')) {
+      return responses[lang].greeting;
+    } else if (message.toLowerCase().includes('doctor')) {
+      return responses[lang].doctor;
+    } else if (message.toLowerCase().includes('lab')) {
+      return responses[lang].lab;
+    }
+    
+    return responses[lang].default;
   };
 
   return (
@@ -100,7 +92,7 @@ const AppointmentChat: React.FC<AppointmentChatProps> = ({
       <div className="grid grid-cols-2 gap-4">
         <Select value={selectedCustomer} onValueChange={setSelectedCustomer}>
           <SelectTrigger>
-            <SelectValue placeholder={language === 'english' ? 'Select Customer' : 'வாடிக்கையாளரை தேர்வு செய்க'} />
+            <SelectValue placeholder={language === 'english' ? 'Select Customer' : 'வாடிக்கையாளரைத் தேர்வு செய்க'} />
           </SelectTrigger>
           <SelectContent>
             {customers.map(customer => (
@@ -113,14 +105,14 @@ const AppointmentChat: React.FC<AppointmentChatProps> = ({
 
         <Select value={appointmentType} onValueChange={(value: 'doctor' | 'lab') => setAppointmentType(value)}>
           <SelectTrigger>
-            <SelectValue placeholder={language === 'english' ? 'Select Type' : 'வகையை தேர்வு செய்க'} />
+            <SelectValue placeholder={language === 'english' ? 'Select Type' : 'வகையைத் தேர்வு செய்க'} />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="doctor">
-              {language === 'english' ? 'Doctor' : 'மருத்துவர்'}
+              {language === 'english' ? 'Doctor Appointment' : 'மருத்துவர் நேரம்'}
             </SelectItem>
             <SelectItem value="lab">
-              {language === 'english' ? 'Lab' : 'ஆய்வகம்'}
+              {language === 'english' ? 'Lab Test' : 'ஆய்வக சோதனை'}
             </SelectItem>
           </SelectContent>
         </Select>
@@ -142,7 +134,7 @@ const AppointmentChat: React.FC<AppointmentChatProps> = ({
                         : 'bg-muted'
                     }`}
                   >
-                    <p className="text-sm">{message.content}</p>
+                    <p>{message.content}</p>
                     <p className="text-xs mt-1 opacity-70">
                       {message.timestamp.toLocaleTimeString()}
                     </p>
@@ -155,13 +147,13 @@ const AppointmentChat: React.FC<AppointmentChatProps> = ({
       </Card>
 
       <div className="flex gap-2">
-        <Textarea
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
+        <Input
+          value={inputMessage}
+          onChange={(e) => setInputMessage(e.target.value)}
           placeholder={language === 'english' ? 'Type your message...' : 'உங்கள் செய்தியை உள்ளிடவும்...'}
-          className="flex-1"
+          onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
         />
-        <Button onClick={handleSend}>
+        <Button onClick={handleSendMessage}>
           {language === 'english' ? 'Send' : 'அனுப்பு'}
         </Button>
       </div>

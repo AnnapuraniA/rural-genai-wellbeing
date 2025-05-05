@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import type { HealthSakhi } from '@/lib/database';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
+import { type HealthSakhi } from '@/lib/database';
 
 interface InboxProps {
   healthSakhi: HealthSakhi;
@@ -12,11 +12,11 @@ interface InboxProps {
 
 interface Message {
   id: string;
-  sender: string;
+  type: 'appointment' | 'test_result' | 'notification';
+  title: string;
   content: string;
   timestamp: Date;
-  type: 'appointment' | 'test_result' | 'notification';
-  read: boolean;
+  isRead: boolean;
 }
 
 const Inbox: React.FC<InboxProps> = ({
@@ -26,158 +26,148 @@ const Inbox: React.FC<InboxProps> = ({
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      sender: 'Dr. Kumar',
-      content: 'Your appointment with Mrs. Lakshmi has been confirmed for tomorrow at 2 PM.',
-      timestamp: new Date(Date.now() - 1000 * 60 * 30), // 30 minutes ago
       type: 'appointment',
-      read: false
+      title: language === 'english' ? 'New Appointment Request' : 'புதிய நேரம் பதிவு கோரிக்கை',
+      content: language === 'english' 
+        ? 'Ravi Kumar requested an appointment for tomorrow at 2 PM' 
+        : 'ரவி குமார் நாளை மதியம் 2 மணிக்கு நேரம் பதிவு கோரியுள்ளார்',
+      timestamp: new Date(Date.now() - 1000 * 60 * 30), // 30 minutes ago
+      isRead: false
     },
     {
       id: '2',
-      sender: 'City Lab',
-      content: 'Blood test results for Mr. Rajan are now available. Please check the patient portal.',
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
       type: 'test_result',
-      read: true
+      title: language === 'english' ? 'Lab Test Results Available' : 'ஆய்வக சோதனை முடிவுகள் கிடைக்கின்றன',
+      content: language === 'english'
+        ? 'Blood test results for Priya are now available'
+        : 'பிரியாவின் இரத்த சோதனை முடிவுகள் இப்போது கிடைக்கின்றன',
+      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
+      isRead: true
     },
     {
       id: '3',
-      sender: 'System',
-      content: 'New health guidelines for diabetes management have been published. Click to view.',
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24), // 1 day ago
       type: 'notification',
-      read: false
+      title: language === 'english' ? 'System Update' : 'கணினி புதுப்பித்தல்',
+      content: language === 'english'
+        ? 'New features have been added to the dashboard'
+        : 'டாஷ்போர்டில் புதிய அம்சங்கள் சேர்க்கப்பட்டுள்ளன',
+      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24), // 1 day ago
+      isRead: false
     }
   ]);
 
-  const markAsRead = (messageId: string) => {
+  const handleMessageClick = (messageId: string) => {
     setMessages(prev =>
       prev.map(msg =>
-        msg.id === messageId ? { ...msg, read: true } : msg
+        msg.id === messageId ? { ...msg, isRead: true } : msg
       )
     );
   };
 
+  const getUnreadCount = (type: Message['type'] | 'all') => {
+    return messages.filter(msg => !msg.isRead && (type === 'all' || msg.type === type)).length;
+  };
+
+  const getFilteredMessages = (type: Message['type'] | 'all') => {
+    return type === 'all'
+      ? messages
+      : messages.filter(msg => msg.type === type);
+  };
+
   const getMessageTypeLabel = (type: Message['type']) => {
-    if (language === 'english') {
-      switch (type) {
-        case 'appointment': return 'Appointment';
-        case 'test_result': return 'Test Result';
-        case 'notification': return 'Notification';
+    const labels = {
+      appointment: {
+        english: 'Appointment',
+        tamil: 'நேரம் பதிவு'
+      },
+      test_result: {
+        english: 'Test Result',
+        tamil: 'சோதனை முடிவு'
+      },
+      notification: {
+        english: 'Notification',
+        tamil: 'அறிவிப்பு'
       }
-    } else {
-      switch (type) {
-        case 'appointment': return 'நேரம் பதிவு';
-        case 'test_result': return 'சோதனை முடிவு';
-        case 'notification': return 'அறிவிப்பு';
-      }
-    }
+    };
+    return labels[type][language];
   };
-
-  const getUnreadCount = (type: Message['type']) => {
-    return messages.filter(msg => msg.type === type && !msg.read).length;
-  };
-
-  const renderMessage = (message: Message) => (
-    <div
-      key={message.id}
-      className={`p-4 border-b last:border-b-0 cursor-pointer hover:bg-muted/50 ${
-        !message.read ? 'bg-muted/30' : ''
-      }`}
-      onClick={() => markAsRead(message.id)}
-    >
-      <div className="flex justify-between items-start mb-2">
-        <div>
-          <span className="font-medium">{message.sender}</span>
-          <span className="text-sm text-muted-foreground ml-2">
-            {getMessageTypeLabel(message.type)}
-          </span>
-        </div>
-        <span className="text-xs text-muted-foreground">
-          {message.timestamp.toLocaleString()}
-        </span>
-      </div>
-      <p className="text-sm">{message.content}</p>
-    </div>
-  );
 
   return (
     <Tabs defaultValue="all" className="space-y-4">
-      <TabsList>
-        <TabsTrigger value="all">
+      <TabsList className="grid w-full grid-cols-4">
+        <TabsTrigger value="all" className="relative">
           {language === 'english' ? 'All' : 'அனைத்தும்'}
-        </TabsTrigger>
-        <TabsTrigger value="appointment">
-          {language === 'english' ? 'Appointments' : 'நேரம் பதிவு'}
-          {getUnreadCount('appointment') > 0 && (
-            <span className="ml-2 bg-primary text-primary-foreground text-xs px-2 py-0.5 rounded-full">
-              {getUnreadCount('appointment')}
-            </span>
+          {getUnreadCount('all') > 0 && (
+            <Badge variant="secondary" className="absolute -top-2 -right-2">
+              {getUnreadCount('all')}
+            </Badge>
           )}
         </TabsTrigger>
-        <TabsTrigger value="test_result">
+        <TabsTrigger value="appointment" className="relative">
+          {language === 'english' ? 'Appointments' : 'நேரம் பதிவுகள்'}
+          {getUnreadCount('appointment') > 0 && (
+            <Badge variant="secondary" className="absolute -top-2 -right-2">
+              {getUnreadCount('appointment')}
+            </Badge>
+          )}
+        </TabsTrigger>
+        <TabsTrigger value="test_result" className="relative">
           {language === 'english' ? 'Test Results' : 'சோதனை முடிவுகள்'}
           {getUnreadCount('test_result') > 0 && (
-            <span className="ml-2 bg-primary text-primary-foreground text-xs px-2 py-0.5 rounded-full">
+            <Badge variant="secondary" className="absolute -top-2 -right-2">
               {getUnreadCount('test_result')}
-            </span>
+            </Badge>
           )}
         </TabsTrigger>
-        <TabsTrigger value="notification">
+        <TabsTrigger value="notification" className="relative">
           {language === 'english' ? 'Notifications' : 'அறிவிப்புகள்'}
           {getUnreadCount('notification') > 0 && (
-            <span className="ml-2 bg-primary text-primary-foreground text-xs px-2 py-0.5 rounded-full">
+            <Badge variant="secondary" className="absolute -top-2 -right-2">
               {getUnreadCount('notification')}
-            </span>
+            </Badge>
           )}
         </TabsTrigger>
       </TabsList>
 
-      <TabsContent value="all">
-        <Card>
-          <CardContent className="p-0">
-            <ScrollArea className="h-[400px]">
-              {messages.map(renderMessage)}
-            </ScrollArea>
-          </CardContent>
-        </Card>
-      </TabsContent>
-
-      <TabsContent value="appointment">
-        <Card>
-          <CardContent className="p-0">
-            <ScrollArea className="h-[400px]">
-              {messages
-                .filter(msg => msg.type === 'appointment')
-                .map(renderMessage)}
-            </ScrollArea>
-          </CardContent>
-        </Card>
-      </TabsContent>
-
-      <TabsContent value="test_result">
-        <Card>
-          <CardContent className="p-0">
-            <ScrollArea className="h-[400px]">
-              {messages
-                .filter(msg => msg.type === 'test_result')
-                .map(renderMessage)}
-            </ScrollArea>
-          </CardContent>
-        </Card>
-      </TabsContent>
-
-      <TabsContent value="notification">
-        <Card>
-          <CardContent className="p-0">
-            <ScrollArea className="h-[400px]">
-              {messages
-                .filter(msg => msg.type === 'notification')
-                .map(renderMessage)}
-            </ScrollArea>
-          </CardContent>
-        </Card>
-      </TabsContent>
+      {(['all', 'appointment', 'test_result', 'notification'] as const).map(tab => (
+        <TabsContent key={tab} value={tab}>
+          <Card>
+            <CardContent className="p-4">
+              <ScrollArea className="h-[400px] pr-4">
+                <div className="space-y-4">
+                  {getFilteredMessages(tab).map(message => (
+                    <div
+                      key={message.id}
+                      className={`border rounded-lg p-4 cursor-pointer transition-colors ${
+                        message.isRead ? 'bg-background' : 'bg-muted/50'
+                      }`}
+                      onClick={() => handleMessageClick(message.id)}
+                    >
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{message.title}</span>
+                            {!message.isRead && (
+                              <Badge variant="secondary" className="h-2 w-2 p-0 rounded-full" />
+                            )}
+                          </div>
+                          <span className="text-sm text-muted-foreground">
+                            {getMessageTypeLabel(message.type)}
+                          </span>
+                        </div>
+                        <span className="text-sm text-muted-foreground">
+                          {message.timestamp.toLocaleString()}
+                        </span>
+                      </div>
+                      <p className="text-sm">{message.content}</p>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      ))}
     </Tabs>
   );
 };

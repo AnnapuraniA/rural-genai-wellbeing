@@ -17,12 +17,9 @@ const createMarkerIcon = (markerType: string, distance?: number, isSelected: boo
       case 'coordinator':
         return '#2E7D32'; // Forest Green
       case 'healthSakhi':
-        if (dist === undefined) return '#A1887F'; // Default Soil Brown
-        if (dist <= 2) return '#4CAF50'; // Green
-        if (dist <= 5) return '#FF9800'; // Orange
-        return '#F44336'; // Red
+        return '#A1887F'; // Soil Brown
       case 'customer':
-        return '#2196F3'; // Always Blue
+        return '#2196F3'; // Blue
       case 'lab':
         return '#FFCA28'; // Golden Yellow
       default:

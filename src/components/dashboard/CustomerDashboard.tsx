@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -9,18 +9,22 @@ import { useToast } from '@/components/ui/use-toast';
 import { 
   getCustomerById,
   getHealthSakhiById,
+  getCustomerMessages,
+  sendMessage,
+  markMessageAsRead,
   getNearbyLabs,
   calculateDistanceInKm,
   type Customer,
   type HealthSakhi,
-  type Lab
+  type Lab,
+  type Message
 } from '@/lib/database';
 import { 
   convertCustomersToMarkers,
   convertLabsToMarkers,
   convertHealthSakhisToMarkers,
   filterMarkersByDistance,
-  MapMarker
+  type MapMarker
 } from '@/lib/mapServices';
 import MapView from '@/components/MapView';
 import AIChat from '@/components/AIChat';
@@ -30,18 +34,37 @@ import { textToSpeech } from '@/lib/aiServices';
 import ConcentricCircles from '@/components/map/ConcentricCircles';
 import { ErrorBoundary } from 'react-error-boundary';
 
+interface Appointment {
+  id: string;
+  customerId: string;
+  customerName: string;
+  healthSakhiId: string;
+  healthSakhiName: string;
+  testName: string;
+  date: string;
+  status: 'pending' | 'completed' | 'cancelled';
+  results?: string;
+}
+
 const CustomerDashboard: React.FC = () => {
   const { t } = useTranslation();
   const { currentUser } = useAuth();
   const { language } = useLanguage();
   const { toast } = useToast();
   const [customer, setCustomer] = useState<Customer | null>(null);
-  const [healthSakhi, setHealthSakhi] = useState<HealthSakhi | null>(null);
+  const [assignedHealthSakhi, setAssignedHealthSakhi] = useState<HealthSakhi | null>(null);
   const [labs, setLabs] = useState<Lab[]>([]);
-  const [selectedSakhi, setSelectedSakhi] = useState<HealthSakhi | null>(null);
-  const [filteredMarkers, setFilteredMarkers] = useState<MapMarker[]>([]);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedMarker, setSelectedMarker] = useState<MapMarker | null>(null);
+  const [markers, setMarkers] = useState<MapMarker[]>([]);
+
+  // Memoize legend items
+  const legendItems = useMemo(() => [
+    { color: '#A1887F', label: language === 'english' ? 'Health Sakhi' : 'ஆரோக்கிய சகி' }
+  ], [language]);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -54,17 +77,22 @@ const CustomerDashboard: React.FC = () => {
         setCustomer(customerData);
         
         if (customerData) {
-          // Get health sakhi data
-          const sakhiData = getHealthSakhiById(customerData.linkedHealthSakhi);
-          setHealthSakhi(sakhiData);
-          setSelectedSakhi(sakhiData);
+          // Get assigned health sakhi
+          if (customerData.linkedHealthSakhi) {
+            const sakhi = getHealthSakhiById(customerData.linkedHealthSakhi);
+            setAssignedHealthSakhi(sakhi || null);
+          }
+          
+          // Get messages
+          const customerMessages = getCustomerMessages(customerData.id);
+          setMessages(customerMessages);
           
           // Get nearby labs
           const labsData = getNearbyLabs(customerData.latitude, customerData.longitude, 10);
           setLabs(labsData);
           
           // Create markers array
-          const markers: MapMarker[] = [
+          const markersArray: MapMarker[] = [
             // Customer marker
             {
               id: customerData.id,
@@ -72,28 +100,20 @@ const CustomerDashboard: React.FC = () => {
               latitude: customerData.latitude,
               longitude: customerData.longitude,
               title: customerData.name,
-              info: `Age: ${customerData.age}\nGender: ${customerData.gender}`
+              info: `Village: ${customerData.village}`
             }
           ];
           
-          // Add health sakhi marker if available
-          if (sakhiData) {
-            const sakhiDistance = calculateDistanceInKm(
-              customerData.latitude,
-              customerData.longitude,
-              sakhiData.latitude,
-              sakhiData.longitude
-            );
-            
-            markers.push({
-              id: sakhiData.id,
-              type: 'healthSakhi',
-              latitude: sakhiData.latitude,
-              longitude: sakhiData.longitude,
-              title: sakhiData.name,
-              info: `Village: ${sakhiData.village}`,
-              distance: sakhiDistance
-            });
+          // Add assigned health sakhi marker if exists
+          if (customerData.linkedHealthSakhi) {
+            const sakhi = getHealthSakhiById(customerData.linkedHealthSakhi);
+            if (sakhi) {
+              const sakhiMarker = convertHealthSakhisToMarkers([sakhi], {
+                latitude: customerData.latitude,
+                longitude: customerData.longitude
+              });
+              markersArray.push(...sakhiMarker);
+            }
           }
           
           // Add nearest lab if available
@@ -121,7 +141,7 @@ const CustomerDashboard: React.FC = () => {
               nearestLab.longitude
             );
             
-            markers.push({
+            markersArray.push({
               id: nearestLab.id,
               type: 'lab',
               latitude: nearestLab.latitude,
@@ -132,7 +152,9 @@ const CustomerDashboard: React.FC = () => {
             });
           }
           
-          setFilteredMarkers(markers);
+          setMarkers(markersArray);
+          setAppointments(customerData.appointments || []);
+          setSelectedMarker(markersArray[0]);
         }
       } catch (error) {
         console.error('Error loading customer data:', error);
@@ -151,24 +173,32 @@ const CustomerDashboard: React.FC = () => {
     loadData();
   }, [currentUser, language, toast]);
 
-  const handleSakhiClick = (sakhi: any) => {
-    setSelectedSakhi(sakhi);
+  const handleSendMessage = (content: string, type: Message['type'], appointmentId?: string) => {
+    if (!customer || !assignedHealthSakhi) return;
     
-    // Filter markers within 10km of selected sakhi
-    const sakhiLocation = {
-      latitude: sakhi.latitude,
-      longitude: sakhi.longitude
-    };
+    const newMessage = sendMessage({
+      fromId: customer.id,
+      fromName: customer.name,
+      fromType: 'customer',
+      toId: assignedHealthSakhi.id,
+      toName: assignedHealthSakhi.name,
+      toType: 'healthSakhi',
+      subject: type === 'appointment' ? 'New Appointment Request' : 'Message from Customer',
+      content,
+      type,
+      appointmentId
+    });
     
-    // First convert markers with distances
-    const customersWithDistances = convertCustomersToMarkers([customer], sakhiLocation);
-    const labsWithDistances = convertLabsToMarkers(labs, sakhiLocation);
-    
-    // Then filter by distance
-    const filteredCustomers = filterMarkersByDistance(customersWithDistances, 10);
-    const filteredLabs = filterMarkersByDistance(labsWithDistances, 10);
-    
-    setFilteredMarkers([...filteredCustomers, ...filteredLabs]);
+    setMessages(prev => [...prev, newMessage]);
+  };
+
+  const handleMarkAsRead = (messageId: string) => {
+    const updatedMessage = markMessageAsRead(messageId);
+    if (updatedMessage) {
+      setMessages(prev => 
+        prev.map(msg => msg.id === messageId ? updatedMessage : msg)
+      );
+    }
   };
 
   const handleTextToSpeech = async (text: string) => {
@@ -233,7 +263,7 @@ const CustomerDashboard: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <p className="text-sm text-gray-600">
-                {language === 'english' ? 'Your Health Sakhi' : 'உங்கள் ஆரோக்கிய சகி'}: {healthSakhi?.name || '-'}
+                {language === 'english' ? 'Your Health Sakhi' : 'உங்கள் ஆரோக்கிய சகி'}: {assignedHealthSakhi?.name || '-'}
               </p>
               <p className="text-sm text-gray-600">
                 {language === 'english' ? 'Village' : 'கிராமம்'}: {customer.village}
@@ -271,18 +301,22 @@ const CustomerDashboard: React.FC = () => {
           <Card className="overflow-hidden">
             <CardHeader>
               <CardTitle>
-                {language === 'english' ? 'Your Location' : 'உங்கள் இருப்பிடம்'}
+                {language === 'english' ? 'Health Sakhi Location' : 'ஆரோக்கிய சகி இருப்பிடம்'}
               </CardTitle>
+              <div className="text-sm text-muted-foreground mt-2">
+                {language === 'english' 
+                  ? 'View your assigned health sakhi location'
+                  : 'உங்கள் ஒதுக்கப்பட்ட ஆரோக்கிய சகி இருப்பிடத்தைக் காண்க'}
+              </div>
             </CardHeader>
             <CardContent className="p-0">
               <ErrorBoundary fallback={<div className="p-4 text-red-500">Error loading map. Please try refreshing the page.</div>}>
                 <MapView 
-                  markers={filteredMarkers}
+                  markers={markers}
                   center={{ latitude: customer.latitude, longitude: customer.longitude }}
                   height="500px"
                   showLegend={true}
-                  onMarkerClick={setSelectedMarker}
-                  selectedMarkerId={selectedMarker?.id}
+                  legendItems={legendItems}
                 />
               </ErrorBoundary>
             </CardContent>

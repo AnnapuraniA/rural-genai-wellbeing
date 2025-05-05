@@ -8,7 +8,25 @@
     "dashboard": "Dashboard",
     "language": "Language",
     "english": "English",
-    "tamil": "Tamil"
+    "tamil": "Tamil",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "view": "View",
+    "back": "Back",
+    "next": "Next",
+    "submit": "Submit",
+    "search": "Search",
+    "filter": "Filter",
+    "sort": "Sort",
+    "refresh": "Refresh",
+    "noResults": "No results found",
+    "required": "Required",
+    "optional": "Optional"
   },
   "header": {
     "title": "Rural GenAI Wellbeing",
@@ -24,7 +42,21 @@
     "dontHaveAccount": "Don't have an account?",
     "createAccount": "Create Account",
     "loginError": "Invalid username or password",
-    "loginSuccess": "Successfully logged in"
+    "loginSuccess": "Successfully logged in",
+    "register": "Register",
+    "resetPassword": "Reset Password",
+    "email": "Email",
+    "confirmPassword": "Confirm Password",
+    "name": "Name",
+    "phone": "Phone",
+    "role": "Role",
+    "selectRole": "Select Role",
+    "roles": {
+      "customer": "Customer",
+      "healthSakhi": "Health Sakhi",
+      "lab": "Lab",
+      "coordinator": "Coordinator"
+    }
   },
   "dashboard": {
     "welcome": "Welcome to your dashboard",
@@ -61,7 +93,28 @@
     "pendingResults": "Pending Results",
     "resultsToDeliver": "Results to be delivered",
     "recentRequests": "Recent Test Requests",
-    "comingSoon": "Lab dashboard functionalities coming soon!"
+    "comingSoon": "Lab dashboard functionalities coming soon!",
+    "name": "Lab",
+    "profile": "Profile",
+    "customers": "Customers",
+    "services": "Services",
+    "messages": "Messages",
+    "active": "Active",
+    "inYourArea": "in your area",
+    "servicesOffered": "Services Offered",
+    "healthSakhi": "Health Sakhi",
+    "noHealthSakhi": "No health sakhi assigned",
+    "sendMessage": "Send Message",
+    "newMessage": "New Message",
+    "messageType": {
+      "appointment": "Appointment",
+      "result": "Test Result",
+      "message": "Message"
+    },
+    "messageStatus": {
+      "read": "Read",
+      "unread": "Unread"
+    }
   },
   "customer": {
     "dashboard": "Customer Dashboard",
@@ -86,6 +139,52 @@
     "listen": "🔊 Listen",
     "textToSpeech": "Text-to-Speech",
     "playingAudio": "Playing audio...",
-    "audioError": "Failed to play audio. Please try again."
+    "audioError": "Failed to play audio. Please try again.",
+    "name": "Customer",
+    "profile": "Profile",
+    "appointments": "Appointments",
+    "testResults": "Test Results",
+    "messages": "Messages",
+    "mapView": "Map View",
+    "appointmentsScheduled": "Appointments Scheduled",
+    "completedTests": "Completed Tests",
+    "noHealthSakhi": "No health sakhi assigned",
+    "sendMessage": "Send Message",
+    "newMessage": "New Message",
+    "messageType": {
+      "appointment": "Appointment",
+      "result": "Test Result",
+      "message": "Message"
+    },
+    "messageStatus": {
+      "read": "Read",
+      "unread": "Unread"
+    }
+  },
+  "healthSakhi": {
+    "name": "Health Sakhi",
+    "dashboard": "Dashboard",
+    "profile": "Profile",
+    "customers": "Customers",
+    "appointments": "Appointments",
+    "messages": "Messages",
+    "mapView": "Map View",
+    "customerList": "Customer List",
+    "active": "Active",
+    "inYourArea": "in your area",
+    "appointmentsScheduled": "Appointments Scheduled",
+    "lab": "Lab",
+    "noLab": "No lab assigned",
+    "sendMessage": "Send Message",
+    "newMessage": "New Message",
+    "messageType": {
+      "appointment": "Appointment",
+      "result": "Test Result",
+      "message": "Message"
+    },
+    "messageStatus": {
+      "read": "Read",
+      "unread": "Unread"
+    }
   }
 } 

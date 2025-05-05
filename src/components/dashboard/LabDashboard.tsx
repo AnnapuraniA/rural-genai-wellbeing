@@ -3,67 +3,63 @@ import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Slider } from '@/components/ui/slider';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { 
   getLabById,
   getNearbyCustomers,
-  calculateDistanceInKm
+  getHealthSakhiById,
+  getLabMessages,
+  sendMessage,
+  markMessageAsRead,
+  calculateDistanceInKm,
+  type Lab,
+  type Customer,
+  type HealthSakhi,
+  type Message
 } from '@/lib/database';
 import { 
   convertCustomersToMarkers,
-  convertLabsToMarkers,
-  MapMarker
+  convertHealthSakhisToMarkers,
+  type MapMarker
 } from '@/lib/mapServices';
 import MapView from '@/components/MapView';
-import AIChat from '@/components/AIChat';
-import NoteSummarizer from '@/components/NoteSummarizer';
-import EducationalVideos from '@/components/EducationalVideos';
-import ConcentricCircles from '@/components/map/ConcentricCircles';
-import DistanceLine from '@/components/map/DistanceLine';
-import type { Lab, Customer } from '@/lib/database';
 import { ErrorBoundary } from 'react-error-boundary';
 
 type Language = 'english' | 'tamil';
+
+interface Appointment {
+  id: string;
+  customerId: string;
+  customerName: string;
+  healthSakhiId: string;
+  healthSakhiName: string;
+  testName: string;
+  date: string;
+  status: 'pending' | 'completed' | 'cancelled';
+  results?: string;
+}
 
 const LabDashboard: React.FC = () => {
   const { t } = useTranslation();
   const { currentUser } = useAuth();
   const { language } = useLanguage();
-  const [lab, setLab] = useState<any>(null);
-  const [customers, setCustomers] = useState<any[]>([]);
+  const [lab, setLab] = useState<Lab | null>(null);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [assignedHealthSakhi, setAssignedHealthSakhi] = useState<HealthSakhi | null>(null);
   const [markers, setMarkers] = useState<MapMarker[]>([]);
-  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
-  const [selectedService, setSelectedService] = useState<string>('all');
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   // Memoize legend items
   const legendItems = useMemo(() => [
     { color: '#FFCA28', label: language === 'english' ? 'Lab' : 'ஆய்வகம்' },
-    { color: '#2196F3', label: language === 'english' ? 'Customer' : 'வாடிக்கையாளர்' }
+    { color: '#2196F3', label: language === 'english' ? 'Customer' : 'வாடிக்கையாளர்' },
+    { color: '#A1887F', label: language === 'english' ? 'Health Sakhi' : 'ஆரோக்கிய சகி' }
   ], [language]);
-
-  // Memoize filtered customers
-  const filteredCustomers = useMemo(() => 
-    selectedService === 'all' 
-      ? customers 
-      : customers.filter(customer => customer.services?.includes(selectedService)),
-    [customers, selectedService]
-  );
-
-  // Memoize average distance calculation
-  const averageDistance = useMemo(() => {
-    if (customers.length === 0) return '0.0';
-    const totalDistance = customers.reduce((sum, customer) => 
-      sum + calculateDistanceInKm(
-        lab.latitude,
-        lab.longitude,
-        customer.latitude,
-        customer.longitude
-      ), 0);
-    return (totalDistance / customers.length).toFixed(1);
-  }, [customers, lab]);
 
   // Memoize marker click handler
   const handleMarkerClick = useCallback((marker: MapMarker) => {
@@ -90,6 +86,16 @@ const LabDashboard: React.FC = () => {
           const customersData = getNearbyCustomers(labData.latitude, labData.longitude, 10);
           setCustomers(customersData);
           
+          // Get assigned health sakhi
+          if (labData.linkedHealthSakhi) {
+            const sakhi = getHealthSakhiById(labData.linkedHealthSakhi);
+            setAssignedHealthSakhi(sakhi || null);
+          }
+          
+          // Get messages
+          const labMessages = getLabMessages(labData.id);
+          setMessages(labMessages);
+          
           // Create markers array
           const markersArray: MapMarker[] = [
             // Lab marker
@@ -103,7 +109,19 @@ const LabDashboard: React.FC = () => {
             }
           ];
           
-          // Add customer markers with distances
+          // Add assigned health sakhi marker if exists
+          if (labData.linkedHealthSakhi) {
+            const sakhi = getHealthSakhiById(labData.linkedHealthSakhi);
+            if (sakhi) {
+              const sakhiMarker = convertHealthSakhisToMarkers([sakhi], {
+                latitude: labData.latitude,
+                longitude: labData.longitude
+              });
+              markersArray.push(...sakhiMarker);
+            }
+          }
+          
+          // Add customer markers
           const customerMarkers = convertCustomersToMarkers(customersData, {
             latitude: labData.latitude,
             longitude: labData.longitude
@@ -121,6 +139,34 @@ const LabDashboard: React.FC = () => {
     
     loadData();
   }, [currentUser]);
+
+  const handleSendMessage = (content: string, type: Message['type'], appointmentId?: string) => {
+    if (!lab || !assignedHealthSakhi) return;
+    
+    const newMessage = sendMessage({
+      fromId: lab.id,
+      fromName: lab.name,
+      fromType: 'lab',
+      toId: assignedHealthSakhi.id,
+      toName: assignedHealthSakhi.name,
+      toType: 'healthSakhi',
+      subject: type === 'result' ? 'Test Results' : 'Message from Lab',
+      content,
+      type,
+      appointmentId
+    });
+    
+    setMessages(prev => [...prev, newMessage]);
+  };
+
+  const handleMarkAsRead = (messageId: string) => {
+    const updatedMessage = markMessageAsRead(messageId);
+    if (updatedMessage) {
+      setMessages(prev => 
+        prev.map(msg => msg.id === messageId ? updatedMessage : msg)
+      );
+    }
+  };
 
   if (isLoading) {
     return (
@@ -171,13 +217,19 @@ const LabDashboard: React.FC = () => {
         
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">{t('lab.avgDistance')}</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('lab.healthSakhi')}</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{averageDistance} km</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {t('lab.averageDistance')}
-            </p>
+            {assignedHealthSakhi ? (
+              <>
+                <div className="text-xl font-bold">{assignedHealthSakhi.name}</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {assignedHealthSakhi.village}
+                </p>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">No health sakhi assigned</p>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -197,16 +249,10 @@ const LabDashboard: React.FC = () => {
             {t('lab.customerList')}
           </TabsTrigger>
           <TabsTrigger 
-            value="ai-tools" 
+            value="messages" 
             className="data-[state=active]:border-b-2 data-[state=active]:border-wellnet-green rounded-none px-4 py-2"
           >
-            {t('lab.aiTools')}
-          </TabsTrigger>
-          <TabsTrigger 
-            value="education" 
-            className="data-[state=active]:border-b-2 data-[state=active]:border-wellnet-green rounded-none px-4 py-2"
-          >
-            {t('lab.educationalVideos')}
+            {t('lab.messages')}
           </TabsTrigger>
         </TabsList>
         
@@ -218,8 +264,8 @@ const LabDashboard: React.FC = () => {
               </CardTitle>
               <div className="text-sm text-muted-foreground mt-2">
                 {language === 'english' 
-                  ? 'Click on a customer to see the distance from your lab'
-                  : 'உங்கள் ஆய்வகத்திலிருந்து தூரத்தைப் பார்க்க வாடிக்கையாளரைக் கிளிக் செய்யவும்'}
+                  ? 'View customer and health sakhi locations'
+                  : 'வாடிக்கையாளர் மற்றும் ஆரோக்கிய சகி இருப்பிடங்களைக் காண்க'}
               </div>
             </CardHeader>
             <CardContent className="p-0">
@@ -231,130 +277,105 @@ const LabDashboard: React.FC = () => {
                   showLegend={true}
                   legendItems={legendItems}
                   onMarkerClick={handleMarkerClick}
-                >
-                  <ConcentricCircles
-                    center={{ latitude: lab.latitude, longitude: lab.longitude }}
-                    distances={[2, 5, 10]}
-                    colors={['#4CAF50', '#FF9800', '#F44336']}
-                    opacity={0.2}
-                  />
-                  {selectedCustomer && (
-                    <DistanceLine
-                      start={{
-                        latitude: lab.latitude,
-                        longitude: lab.longitude,
-                        name: lab.name,
-                        address: lab.address
-                      }}
-                      end={{
-                        latitude: selectedCustomer.latitude,
-                        longitude: selectedCustomer.longitude,
-                        name: selectedCustomer.name,
-                        village: selectedCustomer.village
-                      }}
-                      color="#2196F3"
-                      weight={3}
-                      dashArray="5, 10"
-                    />
-                  )}
-                </MapView>
+                />
               </ErrorBoundary>
             </CardContent>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="customers" className="pt-4">
           <Card>
             <CardHeader>
               <CardTitle>{t('lab.customerList')}</CardTitle>
-              <div className="flex gap-2 mt-2">
-                <Button
-                  variant={selectedService === 'all' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setSelectedService('all')}
-                >
-                  {language === 'english' ? 'All Services' : 'அனைத்து சேவைகளும்'}
-                </Button>
-                {lab.services.map((service: string) => (
-                  <Button
-                    key={service}
-                    variant={selectedService === service ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setSelectedService(service)}
-                  >
-                    {service}
-                  </Button>
-                ))}
-              </div>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="text-left border-b">
-                      <th className="pb-2">Name</th>
-                      <th className="pb-2">Village</th>
-                      <th className="pb-2">Age</th>
-                      <th className="pb-2">Gender</th>
-                      <th className="pb-2">Services</th>
-                      <th className="pb-2 text-right">Distance</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredCustomers.map((customer) => {
-                      const distance = calculateDistanceInKm(
-                        lab.latitude,
-                        lab.longitude,
-                        customer.latitude,
-                        customer.longitude
-                      );
-                      return (
-                        <tr 
-                          key={customer.id} 
-                          className="border-b hover:bg-muted cursor-pointer"
-                          onClick={() => handleMarkerClick({
-                            id: customer.id,
-                            type: 'customer',
-                            latitude: customer.latitude,
-                            longitude: customer.longitude,
-                            title: customer.name,
-                            info: `Village: ${customer.village}`
-                          })}
-                        >
-                          <td className="py-3">{customer.name}</td>
-                          <td>{customer.village}</td>
-                          <td>{customer.age}</td>
-                          <td>{customer.gender}</td>
-                          <td>{customer.services?.join(', ') || '-'}</td>
-                          <td className="text-right">{distance.toFixed(1)} km</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+              <div className="space-y-4">
+                {customers.map(customer => (
+                  <Card key={customer.id} className="p-4">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="font-semibold">{customer.name}</h3>
+                        <p className="text-sm text-gray-600">
+                          {language === 'english' ? 'Village' : 'கிராமம்'}: {customer.village}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          {language === 'english' ? 'Age' : 'வயது'}: {customer.age}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          {language === 'english' ? 'Gender' : 'பாலினம்'}: {customer.gender}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm text-gray-600">
+                          {language === 'english' ? 'Distance' : 'தூரம்'}: {
+                            calculateDistanceInKm(
+                              lab.latitude,
+                              lab.longitude,
+                              customer.latitude,
+                              customer.longitude
+                            ).toFixed(1)
+                          } km
+                        </p>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
               </div>
             </CardContent>
           </Card>
         </TabsContent>
-        
-        <TabsContent value="ai-tools" className="pt-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="md:col-span-1">
-              <AIChat language={language as Language} className="h-[600px]" />
-            </div>
-            
-            <div className="md:col-span-1">
-              <NoteSummarizer language={language as Language} />
-            </div>
-          </div>
-        </TabsContent>
-        
-        <TabsContent value="education" className="pt-4">
-          <EducationalVideos language={language as Language} />
+
+        <TabsContent value="messages" className="pt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>{t('lab.messages')}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {messages.map(message => (
+                  <Card 
+                    key={message.id} 
+                    className={`p-4 cursor-pointer ${message.status === 'unread' ? 'bg-blue-50' : ''}`}
+                    onClick={() => {
+                      setSelectedMessage(message);
+                      if (message.status === 'unread') {
+                        handleMarkAsRead(message.id);
+                      }
+                    }}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="font-semibold">{message.subject}</h3>
+                        <p className="text-sm text-gray-600">
+                          {message.fromType === 'healthSakhi' ? 'From' : 'To'}: {message.fromType === 'healthSakhi' ? message.fromName : message.toName}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          {new Date(message.date).toLocaleString()}
+                        </p>
+                        {selectedMessage?.id === message.id && (
+                          <p className="mt-2 text-sm">{message.content}</p>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <span className={`px-2 py-1 rounded text-xs ${
+                          message.type === 'appointment' ? 'bg-yellow-100 text-yellow-800' :
+                          message.type === 'result' ? 'bg-green-100 text-green-800' :
+                          'bg-blue-100 text-blue-800'
+                        }`}>
+                          {message.type}
+                        </span>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>
   );
 };
 
-export default React.memo(LabDashboard);
+export default LabDashboard;
+

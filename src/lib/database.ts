@@ -26,26 +26,27 @@ export interface Coordinator {
 export interface HealthSakhi {
   id: string;
   name: string;
+  village: string;
   latitude: number;
   longitude: number;
-  village: string;
-  linkedCoordinator: string; // ID of the coordinator
-  linkedCustomers: string[]; // IDs of linked customers
-  contactNumber: string;
   specializations: string[];
+  linkedLab?: string;
 }
 
 export interface Customer {
   id: string;
   name: string;
+  age: number;
+  gender: string;
+  village: string;
   latitude: number;
   longitude: number;
-  village: string;
-  linkedHealthSakhi?: string; // ID of the health sakhi if within 10km
-  age: number;
-  gender: 'male' | 'female' | 'other';
+  linkedHealthSakhi?: string;
+  linkedLab?: string;
+  services?: string[];
   contactNumber: string;
   medicalHistory: MedicalRecord[];
+  appointments: Appointment[];
 }
 
 export interface MedicalRecord {
@@ -76,6 +77,35 @@ export interface Lab {
   services: string[];
   workingHours: string;
   workingDays: string[];
+  linkedHealthSakhi?: string; // ID of the health sakhi this lab is assigned to
+}
+
+export interface Appointment {
+  id: string;
+  customerId: string;
+  customerName: string;
+  healthSakhiId: string;
+  healthSakhiName: string;
+  testName: string;
+  date: string;
+  status: 'pending' | 'completed' | 'cancelled';
+  results?: string;
+}
+
+export interface Message {
+  id: string;
+  fromId: string;
+  fromName: string;
+  fromType: 'lab' | 'healthSakhi' | 'customer';
+  toId: string;
+  toName: string;
+  toType: 'lab' | 'healthSakhi' | 'customer';
+  subject: string;
+  content: string;
+  type: 'appointment' | 'result' | 'message';
+  appointmentId?: string;
+  date: string;
+  status: 'read' | 'unread';
 }
 
 // Generate dummy data
@@ -211,48 +241,45 @@ function generateHealthSakhis(coordinators: Coordinator[]): HealthSakhi[] {
     'Nallampalli', 'Morappur', 'Pappireddipatti', 'Dharmapuri'
   ];
   
-  for (let i = 0; i < 20; i++) {
-    // Assign to a random coordinator
-    const randomCoordinatorIndex = Math.floor(Math.random() * coordinators.length);
-    const linkedCoordinator = coordinators[randomCoordinatorIndex].id;
+  // First, assign 3-6 health sakhis to each coordinator
+  coordinators.forEach((coordinator, coordinatorIndex) => {
+    const numHealthSakhis = 3 + Math.floor(Math.random() * 4); // Random number between 3-6
     
-    // Generate coordinates within 20km of the coordinator
-    const { latitude, longitude } = generateRandomCoordinates(
-      coordinators[randomCoordinatorIndex].latitude,
-      coordinators[randomCoordinatorIndex].longitude,
-      20
-    );
-    
-    const specializations = [
-      'Maternal Care', 'Child Health', 'First Aid', 'Nutrition', 
-      'Preventive Care', 'Basic Medicine', 'Health Education'
-    ];
-    
-    const randomSpecializations = [];
-    for (let j = 0; j < 2 + Math.floor(Math.random() * 3); j++) {
-      const randomSpecialization = specializations[Math.floor(Math.random() * specializations.length)];
-      if (!randomSpecializations.includes(randomSpecialization)) {
-        randomSpecializations.push(randomSpecialization);
+    for (let i = 0; i < numHealthSakhis; i++) {
+      // Generate coordinates within 20km of the coordinator
+      const { latitude, longitude } = generateRandomCoordinates(
+        coordinator.latitude,
+        coordinator.longitude,
+        20
+      );
+      
+      const specializations = [
+        'Maternal Care', 'Child Health', 'First Aid', 'Nutrition', 
+        'Preventive Care', 'Basic Medicine', 'Health Education'
+      ];
+      
+      const randomSpecializations = [];
+      for (let j = 0; j < 2 + Math.floor(Math.random() * 3); j++) {
+        const randomSpecialization = specializations[Math.floor(Math.random() * specializations.length)];
+        if (!randomSpecializations.includes(randomSpecialization)) {
+          randomSpecializations.push(randomSpecialization);
+        }
       }
+      
+      const healthSakhi = {
+        id: `hs-${coordinatorIndex * 6 + i + 1}`,
+        name: `Health Sakhi ${coordinatorIndex * 6 + i + 1}`,
+        village: villages[Math.floor(Math.random() * villages.length)],
+        latitude,
+        longitude,
+        specializations: randomSpecializations,
+        linkedLab: Math.random() > 0.5 ? `lab-${Math.floor(Math.random() * 15) + 1}` : undefined
+      };
+      
+      healthSakhis.push(healthSakhi);
+      coordinator.linkedHealthSakhis.push(healthSakhi.id);
     }
-    
-    const healthSakhi = {
-      id: `hs-${i + 1}`,
-      name: `Health Sakhi ${i + 1}`,
-      latitude,
-      longitude,
-      village: villages[Math.floor(Math.random() * villages.length)],
-      linkedCoordinator,
-      linkedCustomers: [],
-      contactNumber: `+91 8${Math.floor(Math.random() * 1000000000).toString().padStart(9, '0')}`,
-      specializations: randomSpecializations
-    };
-    
-    // Add this health sakhi to the coordinator's linked health sakhis
-    coordinators[randomCoordinatorIndex].linkedHealthSakhis.push(healthSakhi.id);
-    
-    healthSakhis.push(healthSakhi);
-  }
+  });
   
   return healthSakhis;
 }
@@ -394,7 +421,7 @@ function generateCustomers(healthSakhis: HealthSakhi[], labs: Lab[]): Customer[]
     if (nearestHealthSakhi) {
       const sakhiIndex = healthSakhis.findIndex(s => s.id === nearestHealthSakhi);
       if (sakhiIndex !== -1) {
-        healthSakhis[sakhiIndex].linkedCustomers.push(`cust-${i + 1}`);
+        healthSakhis[sakhiIndex].linkedLab = `lab-${Math.floor(Math.random() * 15) + 1}`;
       }
     }
     
@@ -414,7 +441,8 @@ function generateCustomers(healthSakhis: HealthSakhi[], labs: Lab[]): Customer[]
       age: 18 + Math.floor(Math.random() * 60), // Age between 18 and 77
       gender: ['male', 'female', 'other'][Math.floor(Math.random() * 2.1)] as 'male' | 'female' | 'other',
       contactNumber: `+91 6${Math.floor(Math.random() * 1000000000).toString().padStart(9, '0')}`,
-      medicalHistory: []
+      medicalHistory: [],
+      appointments: []
     };
     
     // Generate medical records for this customer
@@ -499,4 +527,186 @@ export const getAuthFromLocalStorage = (): User | null => {
 
 export const clearAuthFromLocalStorage = () => {
   localStorage.removeItem('wellnet_user');
+};
+
+// Mock appointments data
+const appointments: Appointment[] = [
+  {
+    id: 'apt1',
+    customerId: 'customer1',
+    customerName: 'Customer 1',
+    healthSakhiId: 'sakhi1',
+    healthSakhiName: 'Lakshmi Devi',
+    testName: 'Blood Test',
+    date: '2024-03-20',
+    status: 'pending'
+  },
+  {
+    id: 'apt2',
+    customerId: 'customer2',
+    customerName: 'Customer 2',
+    healthSakhiId: 'sakhi1',
+    healthSakhiName: 'Lakshmi Devi',
+    testName: 'Urine Test',
+    date: '2024-03-19',
+    status: 'completed',
+    results: 'Normal'
+  }
+];
+
+// Function to get appointments for a lab
+export function getLabAppointments(labId: string): Appointment[] {
+  return appointments.filter(apt => {
+    const customer = customers.find(c => c.id === apt.customerId);
+    return customer?.linkedLab === labId;
+  });
+}
+
+// Function to create a new appointment
+export function createAppointment(appointment: Omit<Appointment, 'id'>): Appointment {
+  const newAppointment = {
+    ...appointment,
+    id: `apt${appointments.length + 1}`
+  };
+  appointments.push(newAppointment);
+  return newAppointment;
+}
+
+// Function to update appointment status
+export function updateAppointmentStatus(appointmentId: string, status: Appointment['status'], results?: string): Appointment | null {
+  const appointment = appointments.find(apt => apt.id === appointmentId);
+  if (appointment) {
+    appointment.status = status;
+    if (results) {
+      appointment.results = results;
+    }
+    return appointment;
+  }
+  return null;
+}
+
+// Mock messages data
+const messages: Message[] = [
+  {
+    id: 'msg1',
+    fromId: 'hs-1',
+    fromName: 'Lakshmi Devi',
+    fromType: 'healthSakhi',
+    toId: 'lab-1',
+    toName: 'Health Lab 1',
+    toType: 'lab',
+    subject: 'New Appointment Request',
+    content: 'Please schedule a blood test for Customer 1 on March 20, 2024.',
+    date: '2024-03-18T10:00:00Z',
+    status: 'unread',
+    type: 'appointment',
+    appointmentId: 'apt1'
+  },
+  {
+    id: 'msg2',
+    fromId: 'lab-1',
+    fromName: 'Health Lab 1',
+    fromType: 'lab',
+    toId: 'hs-1',
+    toName: 'Lakshmi Devi',
+    toType: 'healthSakhi',
+    subject: 'Test Results - Blood Test',
+    content: 'Blood test results for Customer 1 are normal. All parameters are within range.',
+    date: '2024-03-19T14:30:00Z',
+    status: 'unread',
+    type: 'result',
+    appointmentId: 'apt1'
+  }
+];
+
+// Message functions
+export function getLabMessages(labId: string): Message[] {
+  const messages = localStorage.getItem('messages');
+  if (!messages) return [];
+  
+  const allMessages: Message[] = JSON.parse(messages);
+  return allMessages.filter(msg => 
+    (msg.fromId === labId && msg.fromType === 'lab') || 
+    (msg.toId === labId && msg.toType === 'lab')
+  );
+}
+
+export function getHealthSakhiMessages(healthSakhiId: string): Message[] {
+  const messages = localStorage.getItem('messages');
+  if (!messages) return [];
+  
+  const allMessages: Message[] = JSON.parse(messages);
+  return allMessages.filter(msg => 
+    (msg.fromId === healthSakhiId && msg.fromType === 'healthSakhi') || 
+    (msg.toId === healthSakhiId && msg.toType === 'healthSakhi')
+  );
+}
+
+export function getCustomerMessages(customerId: string): Message[] {
+  const messages = localStorage.getItem('messages');
+  if (!messages) return [];
+  
+  const allMessages: Message[] = JSON.parse(messages);
+  return allMessages.filter(msg => 
+    (msg.fromId === customerId && msg.fromType === 'customer') || 
+    (msg.toId === customerId && msg.toType === 'customer')
+  );
+}
+
+export function sendMessage(message: Omit<Message, 'id' | 'date' | 'status'>): Message {
+  const messages = localStorage.getItem('messages');
+  const allMessages: Message[] = messages ? JSON.parse(messages) : [];
+  
+  const newMessage: Message = {
+    ...message,
+    id: `msg_${Date.now()}`,
+    date: new Date().toISOString(),
+    status: 'unread'
+  };
+  
+  allMessages.push(newMessage);
+  localStorage.setItem('messages', JSON.stringify(allMessages));
+  
+  return newMessage;
+}
+
+export function markMessageAsRead(messageId: string): Message | null {
+  const messages = localStorage.getItem('messages');
+  if (!messages) return null;
+  
+  const allMessages: Message[] = JSON.parse(messages);
+  const messageIndex = allMessages.findIndex(msg => msg.id === messageId);
+  
+  if (messageIndex === -1) return null;
+  
+  allMessages[messageIndex] = {
+    ...allMessages[messageIndex],
+    status: 'read'
+  };
+  
+  localStorage.setItem('messages', JSON.stringify(allMessages));
+  return allMessages[messageIndex];
+}
+
+// Initialize database and clear localStorage
+export const initializeDatabase = () => {
+  // Clear localStorage
+  localStorage.clear();
+  
+  // Reinitialize data
+  const coordinators = generateCoordinators();
+  const healthSakhis = generateHealthSakhis(coordinators);
+  const labs = generateLabs();
+  const customers = generateCustomers(healthSakhis, labs);
+  const users = generateUsers();
+  
+  // Update dummyData
+  dummyData.users = users;
+  dummyData.coordinators = coordinators;
+  dummyData.healthSakhis = healthSakhis;
+  dummyData.customers = customers;
+  dummyData.labs = labs;
+  
+  // Save initial messages
+  localStorage.setItem('messages', JSON.stringify(messages));
 };

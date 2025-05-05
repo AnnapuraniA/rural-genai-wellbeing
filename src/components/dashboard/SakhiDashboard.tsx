@@ -86,29 +86,28 @@ const SakhiDashboard: React.FC = () => {
   }, [customers, labs]);
 
   useEffect(() => {
+    if (!currentUser) return;
+    
     const loadData = async () => {
       try {
         setIsLoading(true);
-        // Load health sakhi data
-        const sakhiResponse = await fetch('/api/health-sakhis/me');
-        const sakhiData = await sakhiResponse.json();
+        // Get health sakhi data
+        const sakhiData = getHealthSakhiById(currentUser.linkedId);
         setHealthSakhi(sakhiData);
-
-        // Load customers data
-        const customersResponse = await fetch('/api/customers');
-        const customersData = await customersResponse.json();
-        setCustomers(customersData);
-
-        // Load labs data
-        const labsResponse = await fetch('/api/labs');
-        const labsData = await labsResponse.json();
-        setLabs(labsData);
-
-        // Create markers array
-        const markersArray: MapMarker[] = [];
-
-        // Add health sakhi marker
+        
         if (sakhiData) {
+          // Get customers data
+          const customersData = getCustomersByHealthSakhiId(sakhiData.id);
+          setCustomers(customersData);
+          
+          // Get labs data
+          const labsData = getNearbyLabs(sakhiData.latitude, sakhiData.longitude, 10);
+          setLabs(labsData);
+          
+          // Create markers array
+          const markersArray: MapMarker[] = [];
+
+          // Add health sakhi marker
           markersArray.push({
             id: sakhiData.id,
             type: 'healthSakhi',
@@ -117,32 +116,32 @@ const SakhiDashboard: React.FC = () => {
             title: sakhiData.name,
             info: `Village: ${sakhiData.village}`
           });
+
+          // Add customer markers
+          const customerMarkers = convertCustomersToMarkers(
+            customersData,
+            { latitude: sakhiData.latitude, longitude: sakhiData.longitude }
+          );
+          markersArray.push(...customerMarkers);
+
+          // Add lab markers
+          const labMarkers = convertLabsToMarkers(
+            labsData,
+            { latitude: sakhiData.latitude, longitude: sakhiData.longitude }
+          );
+          markersArray.push(...labMarkers);
+
+          setMarkers(markersArray);
         }
-
-        // Add customer markers
-        const customerMarkers = convertCustomersToMarkers(
-          customersData.filter((customer: Customer) => customer.linkedHealthSakhi === sakhiData.id),
-          sakhiData ? { latitude: sakhiData.latitude, longitude: sakhiData.longitude } : undefined
-        );
-        markersArray.push(...customerMarkers);
-
-        // Add lab markers
-        const labMarkers = convertLabsToMarkers(
-          labsData,
-          sakhiData ? { latitude: sakhiData.latitude, longitude: sakhiData.longitude } : undefined
-        );
-        markersArray.push(...labMarkers);
-
-        setMarkers(markersArray);
       } catch (error) {
         console.error('Error loading data:', error);
       } finally {
         setIsLoading(false);
       }
     };
-
+    
     loadData();
-  }, []);
+  }, [currentUser]);
 
   if (isLoading) {
     return (
@@ -246,13 +245,13 @@ const SakhiDashboard: React.FC = () => {
             </CardHeader>
             <CardContent className="p-0">
               <ErrorBoundary fallback={<div className="p-4 text-red-500">Error loading map. Please try refreshing the page.</div>}>
-                <MapView
+              <MapView 
                   center={{ latitude: healthSakhi.latitude, longitude: healthSakhi.longitude }}
                   markers={markers}
                   onMarkerClick={handleMarkerClick}
                 >
                   <ConcentricCircles
-                    center={{ latitude: healthSakhi.latitude, longitude: healthSakhi.longitude }}
+                center={{ latitude: healthSakhi.latitude, longitude: healthSakhi.longitude }}
                     distances={[2, 5, 10]}
                     colors={['#A1887F', '#A1887F', '#A1887F']}
                     opacity={0.2}
@@ -305,18 +304,18 @@ const SakhiDashboard: React.FC = () => {
                   </thead>
                   <tbody>
                     {filteredCustomers.map((customer) => (
-                      <tr key={customer.id} className="border-b">
-                        <td className="py-3">{customer.name}</td>
+                        <tr key={customer.id} className="border-b">
+                          <td className="py-3">{customer.name}</td>
                         <td className="py-3">{customer.village}</td>
-                        <td className="text-right">
+                          <td className="text-right">
                           {calculateDistanceInKm(
                             healthSakhi.latitude,
                             healthSakhi.longitude,
                             customer.latitude,
                             customer.longitude
                           ).toFixed(1)} km
-                        </td>
-                      </tr>
+                          </td>
+                        </tr>
                     ))}
                   </tbody>
                 </table>

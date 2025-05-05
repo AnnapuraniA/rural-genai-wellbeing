@@ -33,7 +33,7 @@ const MapLegend: React.FC<MapLegendProps> = ({ show = true, legendItems }) => {
               style={{ backgroundColor: item.color }}
             />
             <span className="text-xs">{item.label}</span>
-          </div>
+      </div>
         ))}
       </div>
     </div>

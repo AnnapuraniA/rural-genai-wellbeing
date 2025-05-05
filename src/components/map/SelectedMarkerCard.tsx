@@ -34,9 +34,9 @@ const SelectedMarkerCard: React.FC<SelectedMarkerCardProps> = ({
           </p>
         )}
         {allowDirections && userLocation && onGetDirections && (
-          <Button
+          <Button 
             variant="outline"
-            size="sm"
+            size="sm" 
             className="mt-4"
             onClick={() => onGetDirections(selectedMarker)}
           >
