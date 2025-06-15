@@ -1,381 +1,557 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useTranslation } from 'react-i18next';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
-import { useAuth } from '@/contexts/AuthContext';
-import { useLanguage } from '@/contexts/LanguageContext';
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useAuth } from "@/contexts/AuthContext";
 import { 
   getLabById,
-  getNearbyCustomers,
-  getHealthSakhiById,
+  getLabAppointments, 
   getLabMessages,
   sendMessage,
-  markMessageAsRead,
-  calculateDistanceInKm,
-  type Lab,
-  type Customer,
-  type HealthSakhi,
-  type Message
-} from '@/lib/database';
-import { 
-  convertCustomersToMarkers,
-  convertHealthSakhisToMarkers,
-  type MapMarker
-} from '@/lib/mapServices';
-import MapView from '@/components/MapView';
-import { ErrorBoundary } from 'react-error-boundary';
+  updateAppointmentStatus,
+  type Message,
+  type Appointment,
+  type Lab
+} from "@/lib/database";
+import { format } from "date-fns";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import { CalendarIcon, CheckCircle2, Clock, XCircle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 
-type Language = 'english' | 'tamil';
-
-interface Appointment {
+interface TestResult {
   id: string;
-  customerId: string;
-  customerName: string;
-  healthSakhiId: string;
-  healthSakhiName: string;
+  appointmentId: string;
   testName: string;
-  date: string;
-  status: 'pending' | 'completed' | 'cancelled';
-  results?: string;
+  result: string;
+  notes: string;
+  timestamp: string;
 }
 
-const LabDashboard: React.FC = () => {
-  const { t } = useTranslation();
+export default function LabDashboard() {
   const { currentUser } = useAuth();
-  const { language } = useLanguage();
   const [lab, setLab] = useState<Lab | null>(null);
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [assignedHealthSakhi, setAssignedHealthSakhi] = useState<HealthSakhi | null>(null);
-  const [markers, setMarkers] = useState<MapMarker[]>([]);
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  // Memoize legend items
-  const legendItems = useMemo(() => [
-    { color: '#FFCA28', label: language === 'english' ? 'Lab' : 'ஆய்வகம்' },
-    { color: '#2196F3', label: language === 'english' ? 'Customer' : 'வாடிக்கையாளர்' },
-    { color: '#A1887F', label: language === 'english' ? 'Health Sakhi' : 'ஆரோக்கிய சகி' }
-  ], [language]);
-
-  // Memoize marker click handler
-  const handleMarkerClick = useCallback((marker: MapMarker) => {
-    if (marker.type === 'customer') {
-      const customer = customers.find(c => c.id === marker.id);
-      if (customer) {
-        setSelectedCustomer(customer);
-      }
-    }
-  }, [customers]);
+  const [selectedCustomer, setSelectedCustomer] = useState<Appointment | null>(null);
+  const [newMessage, setNewMessage] = useState('');
+  const [selectedDate, setSelectedDate] = useState<Date>();
+  const [testResult, setTestResult] = useState<{
+    testName: string;
+    results: Record<string, string>;
+    notes: string;
+  }>({
+    testName: '',
+    results: {},
+    notes: ''
+  });
 
   useEffect(() => {
-    if (!currentUser) return;
-    
+    if (currentUser?.linkedId) {
     const loadData = async () => {
-      try {
-        setIsLoading(true);
-        // Get lab data
-        const labData = getLabById(currentUser.linkedId);
+        const labData = await getLabById(currentUser.linkedId);
         setLab(labData);
         
-        if (labData) {
-          // Get nearby customers within 10km radius
-          const customersData = getNearbyCustomers(labData.latitude, labData.longitude, 10);
-          setCustomers(customersData);
-          
-          // Get assigned health sakhi
-          if (labData.linkedHealthSakhi) {
-            const sakhi = getHealthSakhiById(labData.linkedHealthSakhi);
-            setAssignedHealthSakhi(sakhi || null);
-          }
-          
-          // Get messages
-          const labMessages = getLabMessages(labData.id);
-          setMessages(labMessages);
-          
-          // Create markers array
-          const markersArray: MapMarker[] = [
-            // Lab marker
-            {
-              id: labData.id,
-              type: 'lab',
-              latitude: labData.latitude,
-              longitude: labData.longitude,
-              title: labData.name,
-              info: `Services: ${labData.services.join(', ')}`
-            }
-          ];
-          
-          // Add assigned health sakhi marker if exists
-          if (labData.linkedHealthSakhi) {
-            const sakhi = getHealthSakhiById(labData.linkedHealthSakhi);
-            if (sakhi) {
-              const sakhiMarker = convertHealthSakhisToMarkers([sakhi], {
-                latitude: labData.latitude,
-                longitude: labData.longitude
-              });
-              markersArray.push(...sakhiMarker);
-            }
-          }
-          
-          // Add customer markers
-          const customerMarkers = convertCustomersToMarkers(customersData, {
-            latitude: labData.latitude,
-            longitude: labData.longitude
-          });
-          markersArray.push(...customerMarkers);
-          
-          setMarkers(markersArray);
-        }
-      } catch (error) {
-        console.error('Error loading lab data:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
+        const appointmentsData = await getLabAppointments(currentUser.linkedId);
+        setAppointments(appointmentsData);
+        
+        const messagesData = await getLabMessages(currentUser.linkedId);
+        setMessages(messagesData);
+      };
     loadData();
+    }
   }, [currentUser]);
 
-  const handleSendMessage = (content: string, type: Message['type'], appointmentId?: string) => {
-    if (!lab || !assignedHealthSakhi) return;
+  const handleSendMessage = async () => {
+    if (!selectedCustomer || !newMessage.trim()) return;
     
-    const newMessage = sendMessage({
-      fromId: lab.id,
-      fromName: lab.name,
+    const message: Message = {
+      id: Date.now().toString(),
+      fromId: currentUser?.linkedId || '',
+      fromName: lab?.name || '',
       fromType: 'lab',
-      toId: assignedHealthSakhi.id,
-      toName: assignedHealthSakhi.name,
-      toType: 'healthSakhi',
-      subject: type === 'result' ? 'Test Results' : 'Message from Lab',
-      content,
-      type,
-      appointmentId
-    });
+      toId: selectedCustomer.customerId,
+      toName: selectedCustomer.customerName,
+      toType: 'customer',
+      subject: 'Test Results',
+      content: newMessage,
+      type: 'result',
+      date: new Date().toISOString(),
+      status: 'unread'
+    };
     
-    setMessages(prev => [...prev, newMessage]);
+    await sendMessage(message);
+    setMessages([...messages, message]);
+    setNewMessage('');
   };
 
-  const handleMarkAsRead = (messageId: string) => {
-    const updatedMessage = markMessageAsRead(messageId);
-    if (updatedMessage) {
-      setMessages(prev => 
-        prev.map(msg => msg.id === messageId ? updatedMessage : msg)
-      );
+  const handleUpdateAppointmentStatus = async (appointmentId: string, status: 'completed' | 'cancelled') => {
+    await updateAppointmentStatus(appointmentId, status);
+    setAppointments(appointments.map(apt => 
+      apt.id === appointmentId ? { ...apt, status } : apt
+    ));
+  };
+
+  const handleCompleteAppointment = (appointmentId: string) => {
+    handleUpdateAppointmentStatus(appointmentId, 'completed');
+  };
+
+  const handleCancelAppointment = (appointmentId: string) => {
+    handleUpdateAppointmentStatus(appointmentId, 'cancelled');
+  };
+
+  const handleAddTestResult = async (appointmentId: string) => {
+    if (!testResult.testName || Object.keys(testResult.results).length === 0) return;
+
+    const result: TestResult = {
+      id: Date.now().toString(),
+      appointmentId,
+      testName: testResult.testName,
+      result: JSON.stringify(testResult.results),
+      notes: testResult.notes,
+      date: new Date().toISOString()
+    };
+
+    // Update appointment with results
+    await updateAppointmentStatus(appointmentId, 'completed', JSON.stringify(testResult.results));
+    setTestResult({ testName: '', results: {}, notes: '' });
+    setSelectedCustomer(null);
+    
+    // Send notification to customer
+    const appointment = appointments.find(a => a.id === appointmentId);
+    if (appointment) {
+      const message: Message = {
+        id: Date.now().toString(),
+        fromId: currentUser?.linkedId || '',
+        fromName: lab?.name || '',
+        fromType: 'lab',
+        toId: appointment.customerId,
+        toName: appointment.customerName,
+        toType: 'customer',
+        subject: 'Test Results Ready',
+        content: `Your test results for ${testResult.testName} are ready. Please check your dashboard.`,
+        type: 'result',
+        date: new Date().toISOString(),
+        status: 'unread'
+      };
+      await sendMessage(message);
+      setMessages([...messages, message]);
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-lg font-medium">Loading dashboard...</p>
-      </div>
-    );
-  }
+  const today = new Date();
+  const todayAppointments = appointments.filter(apt => 
+    new Date(apt.date).toDateString() === today.toDateString()
+  );
+  const pendingResults = appointments.filter(apt => 
+    apt.status === 'completed' && !apt.results
+  );
 
-  if (!lab) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-lg font-medium">Lab not found</p>
-      </div>
-    );
-  }
+  // Add some sample data for demonstration
+  const sampleAppointments = [
+    {
+      id: '1',
+      customerId: '1',
+      customerName: 'Priya Sharma',
+      healthSakhiId: '1',
+      healthSakhiName: 'Meera Patel',
+      testName: 'Blood Test',
+      date: new Date().toISOString(),
+      status: 'pending' as const,
+      results: null
+    },
+    {
+      id: '2',
+      customerId: '2',
+      customerName: 'Rajesh Kumar',
+      healthSakhiId: '1',
+      healthSakhiName: 'Meera Patel',
+      testName: 'Diabetes Screening',
+      date: new Date().toISOString(),
+      status: 'completed' as const,
+      results: null
+    }
+  ];
+
+  const sampleTestResults = [
+    {
+      id: '1',
+      appointmentId: '1',
+      patientName: 'Priya Sharma',
+      testName: 'Blood Test',
+      results: {
+        hemoglobin: '12.5 g/dL',
+        glucose: '95 mg/dL',
+        cholesterol: '180 mg/dL'
+      } as Record<string, string>,
+      notes: 'All values within normal range',
+      date: new Date().toISOString()
+    },
+    {
+      id: '2',
+      appointmentId: '2',
+      patientName: 'Rajesh Kumar',
+      testName: 'Diabetes Screening',
+      results: {
+        fastingGlucose: '110 mg/dL',
+        hba1c: '6.2%',
+        randomGlucose: '140 mg/dL'
+      } as Record<string, string>,
+      notes: 'Slightly elevated glucose levels. Recommend follow-up.',
+      date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days ago
+    }
+  ];
+
+  const samplePatientHistory = [
+    {
+      id: '1',
+      patientName: 'Priya Sharma',
+      tests: [
+        {
+          id: '1',
+          testName: 'Blood Test',
+          date: new Date().toISOString(),
+          results: {
+            hemoglobin: '12.5 g/dL',
+            glucose: '95 mg/dL',
+            cholesterol: '180 mg/dL'
+          } as Record<string, string>,
+          notes: 'All values within normal range'
+        },
+        {
+          id: '2',
+          testName: 'Complete Blood Count',
+          date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days ago
+          results: {
+            wbc: '7.5 x10^9/L',
+            rbc: '4.8 x10^12/L',
+            platelets: '250 x10^9/L'
+          } as Record<string, string>,
+          notes: 'Normal CBC results'
+        }
+      ]
+    },
+    {
+      id: '2',
+      patientName: 'Rajesh Kumar',
+      tests: [
+        {
+          id: '3',
+          testName: 'Diabetes Screening',
+          date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days ago
+          results: {
+            fastingGlucose: '110 mg/dL',
+            hba1c: '6.2%',
+            randomGlucose: '140 mg/dL'
+          } as Record<string, string>,
+          notes: 'Slightly elevated glucose levels. Recommend follow-up.'
+        },
+        {
+          id: '4',
+          testName: 'Lipid Profile',
+          date: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString(), // 60 days ago
+          results: {
+            totalCholesterol: '220 mg/dL',
+            hdl: '45 mg/dL',
+            ldl: '140 mg/dL',
+            triglycerides: '180 mg/dL'
+          } as Record<string, string>,
+          notes: 'Borderline high cholesterol. Lifestyle modifications recommended.'
+        }
+      ]
+    }
+  ];
+
+  if (!lab) return <div>Loading...</div>;
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">{t('lab.name')}: {lab.name}</h1>
+      {/* Welcome Message */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <h1 className="text-2xl font-bold text-gray-900">Welcome, {lab?.name}</h1>
+        <p className="text-gray-600 mt-2">Manage your lab operations and test results here.</p>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">{t('lab.customers')}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{customers.length}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {customers.length} {t('lab.active')} {t('lab.customers')} {t('lab.inYourArea')}
+      {/* Overview Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-white rounded-lg shadow p-6">
+          <h3 className="text-lg font-semibold text-gray-900">Today's Appointments</h3>
+          <div className="mt-4 space-y-4">
+            {sampleAppointments.map(apt => (
+              <div key={apt.id} className="border rounded-lg p-4">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="font-medium text-gray-900">{apt.customerName}</p>
+                    <p className="text-sm text-gray-600">{apt.testName}</p>
+                    <p className="text-sm text-gray-500">
+                      {new Date(apt.date).toLocaleTimeString()}
+                    </p>
+                  </div>
+                  <Badge variant={apt.status === 'completed' ? 'default' : 'secondary'}>
+                    {apt.status}
+                  </Badge>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow p-6">
+          <h3 className="text-lg font-semibold text-gray-900">Pending Results</h3>
+          <div className="mt-4 space-y-4">
+            {sampleAppointments.filter(apt => apt.status === 'completed' && !apt.results).map(apt => (
+              <div key={apt.id} className="border rounded-lg p-4">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="font-medium text-gray-900">{apt.customerName}</p>
+                    <p className="text-sm text-gray-600">{apt.testName}</p>
+                    <p className="text-sm text-gray-500">
+                      {new Date(apt.date).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleAddTestResult(apt.id)}
+                  >
+                    Add Results
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow p-6">
+          <h3 className="text-lg font-semibold text-gray-900">Lab Information</h3>
+          <div className="mt-4 space-y-2">
+            <p className="text-sm text-gray-600">
+              <span className="font-medium">Address:</span> {lab?.address}
             </p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">{t('lab.services')}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{lab.services.length}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {t('lab.servicesOffered')}
+            <p className="text-sm text-gray-600">
+              <span className="font-medium">Contact:</span> {lab?.contactNumber}
             </p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">{t('lab.healthSakhi')}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {assignedHealthSakhi ? (
-              <>
-                <div className="text-xl font-bold">{assignedHealthSakhi.name}</div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {assignedHealthSakhi.village}
-                </p>
-              </>
-            ) : (
-              <p className="text-sm text-muted-foreground">No health sakhi assigned</p>
-            )}
-          </CardContent>
-        </Card>
+            <p className="text-sm text-gray-600">
+              <span className="font-medium">Services:</span> {lab?.services.join(', ')}
+            </p>
+          </div>
+        </div>
       </div>
       
-      <Tabs defaultValue="map">
-        <TabsList className="w-full bg-card border-b rounded-none justify-start h-auto p-0">
-          <TabsTrigger 
-            value="map" 
-            className="data-[state=active]:border-b-2 data-[state=active]:border-wellnet-green rounded-none px-4 py-2"
-          >
-            {t('lab.mapView')}
-          </TabsTrigger>
-          <TabsTrigger 
-            value="customers" 
-            className="data-[state=active]:border-b-2 data-[state=active]:border-wellnet-green rounded-none px-4 py-2"
-          >
-            {t('lab.customerList')}
-          </TabsTrigger>
-          <TabsTrigger 
-            value="messages" 
-            className="data-[state=active]:border-b-2 data-[state=active]:border-wellnet-green rounded-none px-4 py-2"
-          >
-            {t('lab.messages')}
-          </TabsTrigger>
+      {/* Tabs */}
+      <Tabs defaultValue="appointments" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="appointments">Appointments</TabsTrigger>
+          <TabsTrigger value="test-results">Test Results</TabsTrigger>
+          <TabsTrigger value="patient-history">Patient History</TabsTrigger>
         </TabsList>
         
-        <TabsContent value="map" className="pt-4">
-          <Card className="overflow-hidden">
-            <CardHeader>
-              <CardTitle>
-                {language === 'english' ? 'Customer Locations' : 'வாடிக்கையாளர் இருப்பிடங்கள்'}
-              </CardTitle>
-              <div className="text-sm text-muted-foreground mt-2">
-                {language === 'english' 
-                  ? 'View customer and health sakhi locations'
-                  : 'வாடிக்கையாளர் மற்றும் ஆரோக்கிய சகி இருப்பிடங்களைக் காண்க'}
-              </div>
-            </CardHeader>
-            <CardContent className="p-0">
-              <ErrorBoundary fallback={<div className="p-4 text-red-500">Error loading map. Please try refreshing the page.</div>}>
-                <MapView 
-                  markers={markers}
-                  center={{ latitude: lab.latitude, longitude: lab.longitude }}
-                  height="500px"
-                  showLegend={true}
-                  legendItems={legendItems}
-                  onMarkerClick={handleMarkerClick}
-                />
-              </ErrorBoundary>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="customers" className="pt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>{t('lab.customerList')}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {customers.map(customer => (
-                  <Card key={customer.id} className="p-4">
+        <TabsContent value="appointments" className="space-y-4">
+          <div className="bg-white rounded-lg shadow">
+            <div className="p-6">
+              <h3 className="text-lg font-semibold text-gray-900">All Appointments</h3>
+              <div className="mt-4 space-y-4">
+                {sampleAppointments.map(apt => (
+                  <div key={apt.id} className="border rounded-lg p-4">
                     <div className="flex justify-between items-start">
                       <div>
-                        <h3 className="font-semibold">{customer.name}</h3>
-                        <p className="text-sm text-gray-600">
-                          {language === 'english' ? 'Village' : 'கிராமம்'}: {customer.village}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          {language === 'english' ? 'Age' : 'வயது'}: {customer.age}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          {language === 'english' ? 'Gender' : 'பாலினம்'}: {customer.gender}
+                        <p className="font-medium text-gray-900">{apt.customerName}</p>
+                        <p className="text-sm text-gray-600">{apt.testName}</p>
+                        <p className="text-sm text-gray-500">
+                          {new Date(apt.date).toLocaleString()}
                         </p>
                       </div>
-                      <div className="text-right">
-                        <p className="text-sm text-gray-600">
-                          {language === 'english' ? 'Distance' : 'தூரம்'}: {
-                            calculateDistanceInKm(
-                              lab.latitude,
-                              lab.longitude,
-                              customer.latitude,
-                              customer.longitude
-                            ).toFixed(1)
-                          } km
-                        </p>
-                      </div>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="messages" className="pt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>{t('lab.messages')}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {messages.map(message => (
-                  <Card 
-                    key={message.id} 
-                    className={`p-4 cursor-pointer ${message.status === 'unread' ? 'bg-blue-50' : ''}`}
-                    onClick={() => {
-                      setSelectedMessage(message);
-                      if (message.status === 'unread') {
-                        handleMarkAsRead(message.id);
-                      }
-                    }}
-                  >
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h3 className="font-semibold">{message.subject}</h3>
-                        <p className="text-sm text-gray-600">
-                          {message.fromType === 'healthSakhi' ? 'From' : 'To'}: {message.fromType === 'healthSakhi' ? message.fromName : message.toName}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          {new Date(message.date).toLocaleString()}
-                        </p>
-                        {selectedMessage?.id === message.id && (
-                          <p className="mt-2 text-sm">{message.content}</p>
+                      <div className="flex gap-2">
+                        {apt.status === 'pending' && (
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleCompleteAppointment(apt.id)}
+                            >
+                              Complete
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleCancelAppointment(apt.id)}
+                            >
+                              Cancel
+                            </Button>
+                          </>
                         )}
                       </div>
-                      <div className="text-right">
-                        <span className={`px-2 py-1 rounded text-xs ${
-                          message.type === 'appointment' ? 'bg-yellow-100 text-yellow-800' :
-                          message.type === 'result' ? 'bg-green-100 text-green-800' :
-                          'bg-blue-100 text-blue-800'
-                        }`}>
-                          {message.type}
-                        </span>
-                      </div>
                     </div>
-                  </Card>
+                  </div>
                 ))}
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="test-results" className="space-y-4">
+          <div className="bg-white rounded-lg shadow">
+            <div className="p-6">
+              <h3 className="text-lg font-semibold text-gray-900">Test Results</h3>
+              <div className="mt-4 space-y-4">
+                {sampleTestResults.map(result => (
+                  <div key={result.id} className="border rounded-lg p-4">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="font-medium text-gray-900">{result.patientName}</p>
+                        <p className="text-sm text-gray-600">{result.testName}</p>
+                        <div className="mt-2 space-y-1">
+                          {Object.entries(result.results).map(([key, value]) => (
+                            <p key={key} className="text-sm text-gray-600">
+                              <span className="font-medium">{key}:</span> {value}
+                            </p>
+                          ))}
+                        </div>
+                        <p className="text-sm text-gray-500 mt-2">
+                          {new Date(result.date).toLocaleDateString()}
+                        </p>
+                        <p className="text-sm text-gray-600 mt-1">{result.notes}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="patient-history" className="space-y-4">
+          <div className="bg-white rounded-lg shadow">
+            <div className="p-6">
+              <h3 className="text-lg font-semibold text-gray-900">Patient History</h3>
+              <div className="mt-4 space-y-6">
+                {samplePatientHistory.map(patient => (
+                  <div key={patient.id} className="border rounded-lg p-4">
+                    <h4 className="text-lg font-medium text-gray-900 mb-4">{patient.patientName}</h4>
+                    <div className="space-y-4">
+                      {patient.tests.map(test => (
+                        <div key={test.id} className="border-l-2 border-gray-200 pl-4">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <p className="font-medium text-gray-900">{test.testName}</p>
+                              <p className="text-sm text-gray-500">
+                                {new Date(test.date).toLocaleDateString()}
+                              </p>
+                              <div className="mt-2 space-y-1">
+                                {Object.entries(test.results).map(([key, value]) => (
+                                  <p key={key} className="text-sm text-gray-600">
+                                    <span className="font-medium">{key}:</span> {value}
+                                  </p>
+                                ))}
+                              </div>
+                              <p className="text-sm text-gray-600 mt-1">{test.notes}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         </TabsContent>
       </Tabs>
+
+      {/* Add Result Dialog */}
+      {selectedCustomer && (
+        <Dialog open={!!selectedCustomer} onOpenChange={() => setSelectedCustomer(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add Test Results for {selectedCustomer.customerName}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Test Name</Label>
+                <Input
+                  value={testResult.testName}
+                  onChange={(e) => setTestResult({ ...testResult, testName: e.target.value })}
+                  placeholder="Enter test name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Results</Label>
+                <div className="space-y-2">
+                  {Object.entries(testResult.results || {}).map(([key, value], index) => (
+                    <div key={index} className="flex gap-2">
+                      <Input
+                        value={key}
+                        onChange={(e) => {
+                          const newResults = { ...testResult.results };
+                          delete newResults[key];
+                          newResults[e.target.value] = value;
+                          setTestResult({ ...testResult, results: newResults });
+                        }}
+                        placeholder="Parameter"
+                      />
+                      <Input
+                        value={value}
+                        onChange={(e) => {
+                          setTestResult({
+                            ...testResult,
+                            results: { ...testResult.results, [key]: e.target.value }
+                          });
+                        }}
+                        placeholder="Value"
+                      />
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => {
+                          const newResults = { ...testResult.results };
+                          delete newResults[key];
+                          setTestResult({ ...testResult, results: newResults });
+                        }}
+                      >
+                        <XCircle className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setTestResult({
+                        ...testResult,
+                        results: { ...testResult.results, '': '' }
+                      });
+                    }}
+                  >
+                    Add Parameter
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Notes</Label>
+                <Textarea
+                  value={testResult.notes}
+                  onChange={(e) => setTestResult({ ...testResult, notes: e.target.value })}
+                  placeholder="Enter any additional notes"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setSelectedCustomer(null)}>
+                Cancel
+              </Button>
+              <Button onClick={() => handleAddTestResult(selectedCustomer.id)}>
+                Save Results
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
-};
-
-export default LabDashboard;
+}
 

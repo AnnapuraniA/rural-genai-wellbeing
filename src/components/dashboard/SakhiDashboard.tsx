@@ -10,7 +10,10 @@ import {
   getHealthSakhiById, 
   getCustomersByHealthSakhiId,
   getNearbyLabs,
-  calculateDistanceInKm
+  calculateDistanceInKm,
+  type HealthSakhi,
+  type Customer,
+  type Lab
 } from '@/lib/database';
 import { 
   convertCustomersToMarkers,
@@ -20,25 +23,77 @@ import {
 import MapView from '@/components/MapView';
 import AIChat from '@/components/AIChat';
 import NoteSummarizer from '@/components/NoteSummarizer';
-import EducationalVideos from '@/components/EducationalVideos';
 import ConcentricCircles from '@/components/map/ConcentricCircles';
 import DistanceLine from '@/components/map/DistanceLine';
-import type { HealthSakhi, Customer, Lab } from '@/lib/database';
 import { ErrorBoundary } from 'react-error-boundary';
+import { Calendar } from '@/components/ui/calendar';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { Bell } from 'lucide-react';
+
+// New interfaces
+interface Message {
+  id: string;
+  senderId: string;
+  receiverId: string;
+  content: string;
+  timestamp: Date;
+}
+
+interface Appointment {
+  id: string;
+  customerId: string;
+  type: 'health' | 'lab';
+  date: Date;
+  time: string;
+  status: 'scheduled' | 'completed' | 'cancelled';
+  notes?: string;
+}
+
+interface HealthRecord {
+  id: string;
+  customerId: string;
+  bloodPressure?: string;
+  bloodSugar?: string;
+  notes?: string;
+  date: Date;
+}
 
 type Language = 'english' | 'tamil';
 
-const SakhiDashboard: React.FC = () => {
+export default function SakhiDashboard() {
   const { t } = useTranslation();
   const { currentUser } = useAuth();
   const { language } = useLanguage();
   const [healthSakhi, setHealthSakhi] = useState<HealthSakhi | null>(null);
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [labs, setLabs] = useState<Lab[]>([]);
-  const [markers, setMarkers] = useState<MapMarker[]>([]);
+  const [nearbyLabs, setNearbyLabs] = useState<Lab[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
-  const [selectedLab, setSelectedLab] = useState<Lab | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [healthRecords, setHealthRecords] = useState<HealthRecord[]>([]);
+  const [appointmentDetails, setAppointmentDetails] = useState({
+    type: 'health' as 'health' | 'lab',
+    date: new Date(),
+    time: '09:00',
+    notes: ''
+  });
+  const [newMessage, setNewMessage] = useState('');
+  const [newHealthRecord, setNewHealthRecord] = useState({
+    bloodPressure: '',
+    bloodSugar: '',
+    notes: ''
+  });
+  const [unreadMessages, setUnreadMessages] = useState(0);
+  const [summary, setSummary] = useState('');
+  const [notifications, setNotifications] = useState<{
+    id: string;
+    message: string;
+    timestamp: Date;
+    read: boolean;
+  }[]>([]);
 
   // Memoize legend items
   const legendItems = useMemo(() => [
@@ -78,19 +133,19 @@ const SakhiDashboard: React.FC = () => {
         setSelectedCustomer(customer);
       }
     } else if (marker.type === 'lab') {
-      const lab = labs.find(l => l.id === marker.id);
+      const lab = nearbyLabs.find(l => l.id === marker.id);
       if (lab) {
-        setSelectedLab(lab);
+        setSelectedCustomer(null);
+        setNearbyLabs([lab]);
       }
     }
-  }, [customers, labs]);
+  }, [customers, nearbyLabs]);
 
   useEffect(() => {
     if (!currentUser) return;
     
     const loadData = async () => {
       try {
-        setIsLoading(true);
         // Get health sakhi data
         const sakhiData = getHealthSakhiById(currentUser.linkedId);
         setHealthSakhi(sakhiData);
@@ -102,7 +157,7 @@ const SakhiDashboard: React.FC = () => {
           
           // Get labs data
           const labsData = getNearbyLabs(sakhiData.latitude, sakhiData.longitude, 10);
-          setLabs(labsData);
+          setNearbyLabs(labsData);
           
           // Create markers array
           const markersArray: MapMarker[] = [];
@@ -110,11 +165,11 @@ const SakhiDashboard: React.FC = () => {
           // Add health sakhi marker
           markersArray.push({
             id: sakhiData.id,
-            type: 'healthSakhi',
+            type: 'healthSakhi' as const,
             latitude: sakhiData.latitude,
             longitude: sakhiData.longitude,
             title: sakhiData.name,
-            info: `Village: ${sakhiData.village}`
+            info: `Village: ${sakhiData.village}\nContact: ${sakhiData.contactNumber}\nSpecializations: ${sakhiData.specializations.join(', ')}`
           });
 
           // Add customer markers
@@ -131,217 +186,636 @@ const SakhiDashboard: React.FC = () => {
           );
           markersArray.push(...labMarkers);
 
-          setMarkers(markersArray);
+          // Handle marker clicks
+          markersArray.forEach(marker => handleMarkerClick(marker));
         }
       } catch (error) {
         console.error('Error loading data:', error);
-      } finally {
-        setIsLoading(false);
       }
     };
     
     loadData();
   }, [currentUser]);
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-lg font-medium">Loading dashboard...</p>
+  const handleNewMessage = useCallback((message: Message) => {
+    if (message.senderId !== healthSakhi?.id) {
+      setUnreadMessages(prev => prev + 1);
+      setNotifications(prev => [
+        {
+          id: message.id,
+          message: `New message from ${customers.find(c => c.id === message.senderId)?.name || 'Customer'}`,
+          timestamp: message.timestamp,
+          read: false
+        },
+        ...prev
+      ]);
+    }
+  }, [healthSakhi, customers]);
+
+  const markMessagesAsRead = useCallback(() => {
+    setUnreadMessages(0);
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+  }, []);
+
+  const handleSendMessage = useCallback(() => {
+    if (!newMessage.trim() || !selectedCustomer || !healthSakhi) return;
+
+    const message: Message = {
+      id: Date.now().toString(),
+      senderId: healthSakhi.id,
+      receiverId: selectedCustomer.id,
+      content: newMessage.trim(),
+      timestamp: new Date()
+    };
+
+    setMessages(prev => [...prev, message]);
+    setNewMessage('');
+  }, [newMessage, selectedCustomer, healthSakhi]);
+
+  const handleScheduleAppointment = useCallback(() => {
+    if (!selectedCustomer || !appointmentDetails.date) return;
+
+    const appointment: Appointment = {
+      id: Date.now().toString(),
+      customerId: selectedCustomer.id,
+      type: appointmentDetails.type,
+      date: appointmentDetails.date,
+      time: appointmentDetails.time,
+      status: 'scheduled',
+      notes: appointmentDetails.notes
+    };
+
+    setAppointments(prev => [...prev, appointment]);
+    setAppointmentDetails({
+      type: 'health',
+      date: new Date(),
+      time: '09:00',
+      notes: ''
+    });
+  }, [selectedCustomer, appointmentDetails]);
+
+  const handleCancelAppointment = useCallback((appointmentId: string) => {
+    setAppointments(prev => prev.map(apt => 
+      apt.id === appointmentId 
+        ? { ...apt, status: 'cancelled' as const }
+        : apt
+    ));
+  }, []);
+
+  const handleAddHealthRecord = useCallback(() => {
+    if (!selectedCustomer) return;
+
+    const record: HealthRecord = {
+      id: Date.now().toString(),
+      customerId: selectedCustomer.id,
+      bloodPressure: newHealthRecord.bloodPressure,
+      bloodSugar: newHealthRecord.bloodSugar,
+      notes: newHealthRecord.notes,
+      date: new Date()
+    };
+
+    setHealthRecords(prev => [...prev, record]);
+    setNewHealthRecord({
+      bloodPressure: '',
+      bloodSugar: '',
+      notes: ''
+    });
+  }, [selectedCustomer, newHealthRecord]);
+
+  const calculateAverageDistance = useCallback(() => {
+    if (!healthSakhi || !customers.length) return 0;
+
+    const totalDistance = customers.reduce((sum, customer) => {
+      return sum + calculateDistanceInKm(
+        healthSakhi.latitude,
+        healthSakhi.longitude,
+        customer.latitude,
+        customer.longitude
+      );
+    }, 0);
+
+    return totalDistance / customers.length;
+  }, [healthSakhi, customers]);
+
+  const getAvailableServices = useCallback(() => {
+    const services = new Set<string>();
+    nearbyLabs.forEach(lab => {
+      lab.services.forEach(service => services.add(service));
+    });
+    return Array.from(services).join(', ');
+  }, [nearbyLabs]);
+
+  // Add notification bell component
+  const NotificationBell = () => (
+    <div className="relative">
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={() => {
+          markMessagesAsRead();
+          // Show notifications dropdown
+        }}
+      >
+        <Bell className="h-5 w-5" />
+        {unreadMessages > 0 && (
+          <Badge className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center p-0">
+            {unreadMessages}
+          </Badge>
+        )}
+      </Button>
       </div>
     );
-  }
 
   if (!healthSakhi) {
     return (
       <div className="flex items-center justify-center h-64">
-        <p className="text-lg font-medium">Health Sakhi data not found.</p>
+        <p className="text-lg font-medium">{t('Loading dashboard...')}</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">{t('sakhi.name')}: {healthSakhi.name}</h1>
-      </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div className="container mx-auto p-4">
+      {/* Welcome Page */}
+      <div className="mb-8">
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">{t('sakhi.customers')}</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>
+                {language === 'english' ? 'Welcome' : 'வரவேற்கிறோம்'}, {healthSakhi?.name}
+              </CardTitle>
+              <CardDescription>
+                {language === 'english' ? 'Health Sakhi Dashboard' : 'ஆரோக்கிய சகி டாஷ்போர்டு'}
+              </CardDescription>
+            </div>
+            <NotificationBell />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{filteredCustomers.length}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {filteredCustomers.length} {t('sakhi.active')} {t('sakhi.customers')} {t('sakhi.inYourArea')}
-            </p>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              <Card>
+                <CardHeader>
+                  <CardTitle>{t('Personal Information')}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p>{t('Name')}: {healthSakhi?.name}</p>
+                  <p>{t('Village')}: {healthSakhi?.village}</p>
+                  <p>{t('Contact')}: {healthSakhi?.contactNumber}</p>
           </CardContent>
         </Card>
         
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">{t('sakhi.village')}</CardTitle>
+                <CardHeader>
+                  <CardTitle>{t('Service Statistics')}</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{healthSakhi.village}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {t('sakhi.primaryServiceArea')}
-            </p>
+                  <p>{t('Total Customers')}: {customers.length}</p>
+                  <p>{t('Average Distance')}: {calculateAverageDistance().toFixed(1)} km</p>
           </CardContent>
         </Card>
         
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">{t('sakhi.nearbyLabs')}</CardTitle>
+                <CardHeader>
+                  <CardTitle>{t('Nearby Resources')}</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{labs.length}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {labs.filter(lab => lab.services.includes('Blood Tests')).length} {t('sakhi.offerBloodTests')}
-            </p>
+                  <p>{t('Nearby Labs')}: {nearbyLabs.length}</p>
+                  <p>{t('Services Available')}: {getAvailableServices()}</p>
+                </CardContent>
+              </Card>
+            </div>
           </CardContent>
         </Card>
       </div>
       
-      <Tabs defaultValue="map">
+      {/* Navigation Tabs */}
+      <Tabs defaultValue="map" className="space-y-4">
         <TabsList className="w-full bg-card border-b rounded-none justify-start h-auto p-0">
-          <TabsTrigger 
-            value="map" 
-            className="data-[state=active]:border-b-2 data-[state=active]:border-wellnet-green rounded-none px-4 py-2"
-          >
-            {t('sakhi.mapView')}
+          <TabsTrigger value="map">
+            {language === 'english' ? 'Map View' : 'வரைபடக் காட்சி'}
           </TabsTrigger>
-          <TabsTrigger 
-            value="customers" 
-            className="data-[state=active]:border-b-2 data-[state=active]:border-wellnet-green rounded-none px-4 py-2"
-          >
-            {t('sakhi.customerList')}
+          <TabsTrigger value="customers">
+            {language === 'english' ? 'Customers' : 'வாடிக்கையாளர்கள்'}
           </TabsTrigger>
-          <TabsTrigger 
-            value="ai-tools" 
-            className="data-[state=active]:border-b-2 data-[state=active]:border-wellnet-green rounded-none px-4 py-2"
-          >
-            {t('sakhi.aiTools')}
+          <TabsTrigger value="appointments">
+            {language === 'english' ? 'Appointments' : 'நேரங்கள்'}
           </TabsTrigger>
-          <TabsTrigger 
-            value="education" 
-            className="data-[state=active]:border-b-2 data-[state=active]:border-wellnet-green rounded-none px-4 py-2"
-          >
-            {t('sakhi.educationalVideos')}
+          <TabsTrigger value="messages" className="relative">
+            {language === 'english' ? 'Messages' : 'செய்திகள்'}
+            {unreadMessages > 0 && (
+              <Badge className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center p-0">
+                {unreadMessages}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="summarizer">
+            {language === 'english' ? 'Note Summarizer' : 'குறிப்பு சுருக்கம்'}
           </TabsTrigger>
         </TabsList>
         
-        <TabsContent value="map" className="pt-4">
-          <Card className="overflow-hidden">
-            <CardHeader>
-              <CardTitle>
-                {language === 'english' ? 'Customer and Lab Locations' : 'வாடிக்கையாளர் மற்றும் ஆய்வக இருப்பிடங்கள்'}
-              </CardTitle>
-              <div className="text-sm text-muted-foreground mt-2">
-                {language === 'english' 
-                  ? 'Click on a customer and then a lab to see the distance between them'
-                  : 'ஒரு வாடிக்கையாளர் மற்றும் ஆய்வகத்தைக் கிளிக் செய்து அவற்றுக்கிடையேயான தூரத்தைப் பார்க்கவும்'}
-              </div>
-            </CardHeader>
-            <CardContent className="p-0">
-              <ErrorBoundary fallback={<div className="p-4 text-red-500">Error loading map. Please try refreshing the page.</div>}>
+        {/* Map View Tab */}
+        <TabsContent value="map">
+          <div className="h-[600px] relative">
               <MapView 
-                  center={{ latitude: healthSakhi.latitude, longitude: healthSakhi.longitude }}
-                  markers={markers}
+              markers={[
+                // Add Health Sakhi marker
+                healthSakhi ? {
+                  id: healthSakhi.id,
+                  type: 'healthSakhi' as const,
+                  latitude: healthSakhi.latitude,
+                  longitude: healthSakhi.longitude,
+                  title: healthSakhi.name,
+                  info: `Village: ${healthSakhi.village}\nContact: ${healthSakhi.contactNumber}\nSpecializations: ${healthSakhi.specializations.join(', ')}`
+                } : null,
+                // Add customer markers with enhanced info
+                ...customers.map(customer => ({
+                  id: customer.id,
+                  type: 'customer' as const,
+                  latitude: customer.latitude,
+                  longitude: customer.longitude,
+                  title: customer.name,
+                  info: `Village: ${customer.village}\nAge: ${customer.age}\nGender: ${customer.gender}\nContact: ${customer.contactNumber}\nDistance: ${calculateDistanceInKm(
+                    healthSakhi?.latitude || 0,
+                    healthSakhi?.longitude || 0,
+                    customer.latitude,
+                    customer.longitude
+                  ).toFixed(1)} km`
+                })),
+                // Add lab markers with enhanced info
+                ...nearbyLabs.map(lab => ({
+                  id: lab.id,
+                  type: 'lab' as const,
+                  latitude: lab.latitude,
+                  longitude: lab.longitude,
+                  title: lab.name,
+                  info: `Address: ${lab.address}\nContact: ${lab.contactNumber}\nServices: ${lab.services.join(', ')}\nWorking Hours: ${lab.workingHours}\nWorking Days: ${lab.workingDays.join(', ')}\nDistance: ${calculateDistanceInKm(
+                    healthSakhi?.latitude || 0,
+                    healthSakhi?.longitude || 0,
+                    lab.latitude,
+                    lab.longitude
+                  ).toFixed(1)} km`
+                }))
+              ].filter(Boolean) as MapMarker[]}
+              center={healthSakhi ? { latitude: healthSakhi.latitude, longitude: healthSakhi.longitude } : undefined}
                   onMarkerClick={handleMarkerClick}
-                >
-                  <ConcentricCircles
-                center={{ latitude: healthSakhi.latitude, longitude: healthSakhi.longitude }}
-                    distances={[2, 5, 10]}
-                    colors={['#A1887F', '#A1887F', '#A1887F']}
-                    opacity={0.2}
-                  />
-                  {selectedCustomer && selectedLab && (
-                    <DistanceLine
-                      start={{
-                        latitude: selectedCustomer.latitude,
-                        longitude: selectedCustomer.longitude,
-                        name: selectedCustomer.name,
-                        village: selectedCustomer.village
-                      }}
-                      end={{
-                        latitude: selectedLab.latitude,
-                        longitude: selectedLab.longitude,
-                        name: selectedLab.name,
-                        address: selectedLab.address
-                      }}
-                      color="#2196F3"
-                      weight={3}
-                      dashArray="5, 10"
-                    />
-                  )}
-                </MapView>
-              </ErrorBoundary>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="customers" className="pt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>{t('sakhi.customerList')}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="py-3 text-left">
-                        {language === 'english' ? 'Name' : 'பெயர்'}
-                      </th>
-                      <th className="py-3 text-left">
-                        {language === 'english' ? 'Village' : 'கிராமம்'}
-                      </th>
-                      <th className="py-3 text-right">
-                        {language === 'english' ? 'Distance' : 'தூரம்'}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredCustomers.map((customer) => (
-                        <tr key={customer.id} className="border-b">
-                          <td className="py-3">{customer.name}</td>
-                        <td className="py-3">{customer.village}</td>
-                          <td className="text-right">
-                          {calculateDistanceInKm(
-                            healthSakhi.latitude,
-                            healthSakhi.longitude,
-                            customer.latitude,
-                            customer.longitude
-                          ).toFixed(1)} km
-                          </td>
-                        </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="ai-tools" className="pt-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="md:col-span-1">
-              <AIChat language={language as Language} className="h-[600px]" />
-            </div>
-            
-            <div className="md:col-span-1">
-              <NoteSummarizer language={language as Language} />
-            </div>
+              showLegend={true}
+              legendItems={legendItems}
+            />
           </div>
         </TabsContent>
         
-        <TabsContent value="education" className="pt-4">
-          <EducationalVideos language={language as Language} />
+        {/* Customers Tab */}
+        <TabsContent value="customers">
+          <div className="grid gap-4 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+                <CardTitle>{t('Customer List')}</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <ScrollArea className="h-[400px]">
+                  {customers.map(customer => (
+                    <div
+                      key={customer.id}
+                      className="p-4 border-b cursor-pointer hover:bg-gray-50"
+                      onClick={() => setSelectedCustomer(customer)}
+                    >
+                      <p className="font-medium">{customer.name}</p>
+                      <p className="text-sm text-gray-500">{customer.village}</p>
+                      <p className="text-sm text-gray-500">
+                        {t('Distance')}: {calculateDistanceInKm(
+                          healthSakhi?.latitude || 0,
+                          healthSakhi?.longitude || 0,
+                            customer.latitude,
+                            customer.longitude
+                          ).toFixed(1)} km
+                      </p>
+                    </div>
+                  ))}
+                </ScrollArea>
+              </CardContent>
+            </Card>
+
+            {selectedCustomer && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>{t('Customer Details')}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="font-medium">{t('Basic Information')}</h3>
+                      <p>{t('Name')}: {selectedCustomer.name}</p>
+                      <p>{t('Village')}: {selectedCustomer.village}</p>
+                      <p>{t('Contact')}: {selectedCustomer.contactNumber}</p>
+                      <p>{t('Distance')}: {calculateDistanceInKm(
+                        healthSakhi?.latitude || 0,
+                        healthSakhi?.longitude || 0,
+                        selectedCustomer.latitude,
+                        selectedCustomer.longitude
+                      ).toFixed(1)} km</p>
+                    </div>
+
+                    <div>
+                      <h3 className="font-medium">{t('Health Records')}</h3>
+                      <ScrollArea className="h-[200px]">
+                        {healthRecords
+                          .filter(record => record.customerId === selectedCustomer.id)
+                          .map(record => (
+                            <div key={record.id} className="p-2 border-b">
+                              <p>{new Date(record.date).toLocaleDateString()}</p>
+                              {record.bloodPressure && <p>BP: {record.bloodPressure}</p>}
+                              {record.bloodSugar && <p>BS: {record.bloodSugar}</p>}
+                              {record.notes && <p>{record.notes}</p>}
+                            </div>
+                          ))}
+                      </ScrollArea>
+                    </div>
+
+                    <div>
+                      <h3 className="font-medium">{t('Add Health Record')}</h3>
+                      <div className="space-y-2">
+                        <Input
+                          placeholder={t('Blood Pressure')}
+                          value={newHealthRecord.bloodPressure}
+                          onChange={e => setNewHealthRecord(prev => ({
+                            ...prev,
+                            bloodPressure: e.target.value
+                          }))}
+                        />
+                        <Input
+                          placeholder={t('Blood Sugar')}
+                          value={newHealthRecord.bloodSugar}
+                          onChange={e => setNewHealthRecord(prev => ({
+                            ...prev,
+                            bloodSugar: e.target.value
+                          }))}
+                        />
+                        <Textarea
+                          placeholder={t('Notes')}
+                          value={newHealthRecord.notes}
+                          onChange={e => setNewHealthRecord(prev => ({
+                            ...prev,
+                            notes: e.target.value
+                          }))}
+                        />
+                        <Button onClick={handleAddHealthRecord}>
+                          {t('Add Record')}
+                        </Button>
+                      </div>
+                    </div>
+              </div>
+            </CardContent>
+          </Card>
+            )}
+          </div>
+        </TabsContent>
+        
+        {/* Appointments Tab */}
+        <TabsContent value="appointments">
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>{t('Schedule Appointment')}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">
+                      {t('Customer')}
+                    </label>
+                    <select
+                      className="w-full p-2 border rounded"
+                      onChange={e => setSelectedCustomer(
+                        customers.find(c => c.id === e.target.value) || null
+                      )}
+                    >
+                      <option value="">{t('Select Customer')}</option>
+                      {customers.map(customer => (
+                        <option key={customer.id} value={customer.id}>
+                          {customer.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-1">
+                      {t('Appointment Type')}
+                    </label>
+                    <select
+                      className="w-full p-2 border rounded"
+                      value={appointmentDetails.type}
+                      onChange={e => setAppointmentDetails(prev => ({
+                        ...prev,
+                        type: e.target.value as 'health' | 'lab'
+                      }))}
+                    >
+                      <option value="health">{t('Health Check')}</option>
+                      <option value="lab">{t('Lab Test')}</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-1">
+                      {t('Date')}
+                    </label>
+                    <Calendar
+                      mode="single"
+                      selected={appointmentDetails.date}
+                      onSelect={date => date && setAppointmentDetails(prev => ({
+                        ...prev,
+                        date
+                      }))}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-1">
+                      {t('Time')}
+                    </label>
+                    <Input
+                      type="time"
+                      value={appointmentDetails.time}
+                      onChange={e => setAppointmentDetails(prev => ({
+                        ...prev,
+                        time: e.target.value
+                      }))}
+                      className="w-full"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-1">
+                      {t('Notes')}
+                    </label>
+                    <Textarea
+                      value={appointmentDetails.notes}
+                      onChange={e => setAppointmentDetails(prev => ({
+                        ...prev,
+                        notes: e.target.value
+                      }))}
+                    />
+            </div>
+            
+                  <Button onClick={handleScheduleAppointment}>
+                    {t('Schedule')}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>{t('Upcoming Appointments')}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ScrollArea className="h-[400px]">
+                  {appointments
+                    .filter(apt => apt.status === 'scheduled')
+                    .sort((a, b) => a.date.getTime() - b.date.getTime())
+                    .map(appointment => {
+                      const customer = customers.find(c => c.id === appointment.customerId);
+                      return (
+                        <div key={appointment.id} className="p-4 border-b">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <p className="font-medium">{customer?.name}</p>
+                              <p className="text-sm text-gray-500">
+                                {new Date(appointment.date).toLocaleDateString()} at {appointment.time}
+                              </p>
+                              <Badge variant={appointment.type === 'health' ? 'default' : 'secondary'}>
+                                {t(appointment.type === 'health' ? 'Health Check' : 'Lab Test')}
+                              </Badge>
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleCancelAppointment(appointment.id)}
+                            >
+                              {t('Cancel')}
+                            </Button>
+                          </div>
+                          {appointment.notes && (
+                            <p className="mt-2 text-sm">{appointment.notes}</p>
+                          )}
+                        </div>
+                      );
+                    })}
+                </ScrollArea>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* Messages Tab */}
+        <TabsContent value="messages">
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>{t('Customer List')}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ScrollArea className="h-[400px]">
+                  {customers.map(customer => (
+                    <div
+                      key={customer.id}
+                      className="p-4 border-b cursor-pointer hover:bg-gray-50"
+                      onClick={() => setSelectedCustomer(customer)}
+                    >
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <p className="font-medium">{customer.name}</p>
+                          <p className="text-sm text-gray-500">{customer.village}</p>
+                        </div>
+                        {messages.some(m => 
+                          m.senderId === customer.id && 
+                          !notifications.find(n => n.id === m.id)?.read
+                        ) && (
+                          <Badge>{t('New')}</Badge>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </ScrollArea>
+              </CardContent>
+            </Card>
+
+            {selectedCustomer && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>{t('Messages')}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <ScrollArea className="h-[300px]">
+                      {messages
+                        .filter(msg => 
+                          (msg.senderId === selectedCustomer.id && msg.receiverId === healthSakhi?.id) ||
+                          (msg.senderId === healthSakhi?.id && msg.receiverId === selectedCustomer.id)
+                        )
+                        .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
+                        .map(message => (
+                          <div
+                            key={message.id}
+                            className={`p-2 rounded-lg mb-2 ${
+                              message.senderId === healthSakhi?.id
+                                ? 'bg-blue-100 ml-auto'
+                                : 'bg-gray-100'
+                            } max-w-[80%]`}
+                          >
+                            <p>{message.content}</p>
+                            <p className="text-xs text-gray-500">
+                              {new Date(message.timestamp).toLocaleString()}
+                            </p>
+                          </div>
+                        ))}
+                    </ScrollArea>
+
+                    <div className="flex gap-2">
+                      <Input
+                        value={newMessage}
+                        onChange={e => setNewMessage(e.target.value)}
+                        placeholder={t('Type a message...')}
+                      />
+                      <Button onClick={handleSendMessage}>
+                        {t('Send')}
+                      </Button>
+                    </div>
+            </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </TabsContent>
+        
+        {/* Summarizer Tab */}
+        <TabsContent value="summarizer">
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>{t('Note Summarizer')}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <NoteSummarizer language={language as Language} />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>{t('Summary Results')}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="prose max-w-none">
+                  {summary ? (
+                    <div dangerouslySetInnerHTML={{ __html: summary }} />
+                  ) : (
+                    <p className="text-gray-500">{t('No summary generated yet')}</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
     </div>
   );
-};
-
-export default React.memo(SakhiDashboard);
+}

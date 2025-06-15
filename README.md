@@ -1,4 +1,68 @@
-# Welcome to your Lovable project
+# Rural GenAI Wellbeing Platform
+
+A comprehensive healthcare platform for rural areas, connecting patients with Health Sakhis and providing access to essential healthcare services.
+
+## Features
+
+- Interactive map showing nearby healthcare facilities
+- Real-time messaging with Health Sakhis
+- Educational video content
+- Health history tracking
+- Appointment scheduling
+
+## Setup Instructions
+
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+2. Download Leaflet marker icons:
+   - Create a directory: `public/images/`
+   - Download the following files from [Leaflet's GitHub repository](https://github.com/Leaflet/Leaflet/tree/main/dist/images):
+     - `marker-icon.png`
+     - `marker-icon-2x.png`
+     - `marker-shadow.png`
+   - Place them in the `public/images/` directory
+
+3. Start the development server:
+   ```bash
+   npm run dev
+   ```
+
+4. Open [http://localhost:5173](http://localhost:5173) in your browser
+
+## Project Structure
+
+- `src/components/` - React components
+- `src/data/` - Mock data and types
+- `src/types/` - TypeScript interfaces
+- `public/` - Static assets
+
+## Technologies Used
+
+- React
+- TypeScript
+- Vite
+- React Bootstrap
+- Leaflet (for maps)
+- React Leaflet
+
+## Development
+
+The project uses:
+- TypeScript for type safety
+- React Bootstrap for UI components
+- Leaflet for interactive maps
+- Mock data for development
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
 
 ## Project info
 
@@ -49,16 +113,6 @@ npm run dev
 - Select the "Codespaces" tab.
 - Click on "New codespace" to launch a new Codespace environment.
 - Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
 
 ## How can I deploy this project?
 

@@ -30,6 +30,9 @@ export interface HealthSakhi {
   latitude: number;
   longitude: number;
   specializations: string[];
+  contactNumber: string;
+  linkedCustomers: string[];
+  coordinatorId: string;
   linkedLab?: string;
 }
 
@@ -266,13 +269,16 @@ function generateHealthSakhis(coordinators: Coordinator[]): HealthSakhi[] {
         }
       }
       
-      const healthSakhi = {
+      const healthSakhi: HealthSakhi = {
         id: `hs-${coordinatorIndex * 6 + i + 1}`,
         name: `Health Sakhi ${coordinatorIndex * 6 + i + 1}`,
         village: villages[Math.floor(Math.random() * villages.length)],
         latitude,
         longitude,
         specializations: randomSpecializations,
+        contactNumber: `+91 9${Math.floor(Math.random() * 1000000000).toString().padStart(9, '0')}`,
+        linkedCustomers: [],
+        coordinatorId: coordinator.id,
         linkedLab: Math.random() > 0.5 ? `lab-${Math.floor(Math.random() * 15) + 1}` : undefined
       };
       
